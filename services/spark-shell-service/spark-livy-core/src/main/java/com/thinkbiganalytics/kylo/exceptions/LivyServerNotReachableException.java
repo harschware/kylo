@@ -1,4 +1,4 @@
-package com.thinkbiganalytics.kylo.model.enums;
+package com.thinkbiganalytics.kylo.exceptions;
 
 /*-
  * #%L
@@ -20,25 +20,20 @@ package com.thinkbiganalytics.kylo.model.enums;
  * #L%
  */
 
-/**
- * Session State
- * Value	Description
- * not_started	Session has not been started
- * starting	Session is starting
- * idle	Session is waiting for input
- * busy	Session is executing a statement
- * shutting_down	Session is shutting down
- * error	Session errored out
- * dead	Session has exited
- * success	Session is successfully stopped
- */
-public enum SessionState {
-    not_started,
-    starting,
-    idle,
-    busy,
-    shutting_down,
-    error,
-    dead,
-    success
+public class LivyServerNotReachableException extends LivyException {
+    public LivyServerNotReachableException() {
+        super();
+    }
+
+    public LivyServerNotReachableException(String s) {
+        super(s);
+    }
+
+    public LivyServerNotReachableException(String s, Throwable throwable) {
+        super(s, throwable);
+    }
+
+    public LivyServerNotReachableException(Throwable cause) {
+        super(cause);
+    }
 }

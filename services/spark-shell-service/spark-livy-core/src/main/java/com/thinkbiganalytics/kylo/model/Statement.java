@@ -1,8 +1,28 @@
 package com.thinkbiganalytics.kylo.model;
 
+/*-
+ * #%L
+ * kylo-spark-livy-core
+ * %%
+ * Copyright (C) 2017 - 2018 ThinkBig Analytics, a Teradata Company
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
 import com.thinkbiganalytics.kylo.model.enums.StatementState;
 
-public class StatementsPostResponse {
+public class Statement {
     private Integer id;
     private String code;
     private StatementState state;
@@ -10,9 +30,9 @@ public class StatementsPostResponse {
     private Double progress;
 
     // default constructor
-    public StatementsPostResponse() {}
+    public Statement() {}
 
-    public StatementsPostResponse(Builder sprb ) {
+    public Statement(Builder sprb ) {
         this.id = sprb.id;
         this.code = sprb.code;
         this.state = sprb.state;
@@ -42,7 +62,7 @@ public class StatementsPostResponse {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("StatementsPostResponse{");
+        final StringBuilder sb = new StringBuilder("Statement{");
         sb.append("id=").append(id);
         sb.append(", code='").append(code).append('\'');
         sb.append(", state='").append(state).append('\'');

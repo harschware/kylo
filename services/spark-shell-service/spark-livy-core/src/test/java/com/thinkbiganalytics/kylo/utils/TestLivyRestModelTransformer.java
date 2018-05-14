@@ -1,10 +1,30 @@
 package com.thinkbiganalytics.kylo.utils;
 
+/*-
+ * #%L
+ * kylo-spark-livy-core
+ * %%
+ * Copyright (C) 2017 - 2018 ThinkBig Analytics, a Teradata Company
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 import com.thinkbiganalytics.discovery.schema.QueryResultColumn;
-import com.thinkbiganalytics.kylo.model.StatementsPostResponse;
+import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.TestSerializing;
-import com.thinkbiganalytics.kylo.model.enums.StatementState;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;
 import org.junit.Test;
@@ -25,19 +45,23 @@ public class TestLivyRestModelTransformer {
         final String json = TestUtils.getTestResourcesFileAsString("dataFrameStatementPostResponse.json");
 
         //JSON from String to Object
-        StatementsPostResponse statementsPostResponse = new ObjectMapper().readValue(json, StatementsPostResponse.class);
-        logger.info("response={}", statementsPostResponse);
+        Statement statement = new ObjectMapper().readValue(json, Statement.class);
+        logger.info("response={}", statement);
 
-        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statementsPostResponse);
+        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement);
         assertThat(response).hasFieldOrPropertyWithValue("status", TransformResponse.Status.SUCCESS );
         assertThat(response).hasFieldOrPropertyWithValue("progress", 1.0);
 
         TransformQueryResult tqr = response.getResults();
+        logger.info("tqr={}", tqr);
         assertThat(tqr).isNotNull();
 
         List<QueryResultColumn> cols = tqr.getColumns();
         assertThat(cols).isNotNull();
-        String dt = cols.get(0).getDataType();
-        String dName = cols.get(0).getDisplayName();
+        QueryResultColumn dt0 = cols.get(0);
+        assertThat(dt0).hasFieldOrPropertyWithValue("dataType", "string");
+
+        List<Object> row1 = Lists.newArrayList( "1", "Toyota Park", "Bridgeview", "IL", "0", "1520786524754");
+        assertThat( tqr.getRows() ).contains(row1);
     }
 }
