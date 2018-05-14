@@ -12,5 +12,6 @@ public enum SessionKind {
     spark,
     pyspark,
     sparkr,
-    sql
+    sql,
+    shared
 }
