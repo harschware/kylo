@@ -26,11 +26,13 @@
             <version>${spark.version}</version>
             <scope>provided</scope>
         </dependency>
+        <!--
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-hive_${scala.binary.version}</artifactId>
             <scope>provided</scope>
         </dependency>
+        -->
         <dependency>
             <groupId>org.apache.livy</groupId>
             <artifactId>livy-client-http</artifactId>
@@ -53,12 +55,13 @@
             <artifactId>kylo-commons-rest-client</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!--
         <dependency>
             <groupId>com.thinkbiganalytics.kylo.integrations</groupId>
             <artifactId>kylo-spark-shell-client-app</artifactId>
             <version>${project.version}</version>
         </dependency>
-
+-->
 
         <!-- Spring -->
         <dependency>

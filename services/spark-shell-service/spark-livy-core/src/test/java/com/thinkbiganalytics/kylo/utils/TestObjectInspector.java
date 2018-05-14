@@ -1,5 +1,6 @@
 package com.thinkbiganalytics.kylo.utils;
 
+/*
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -12,7 +13,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.JavaHiveDecimalOb
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import com.thinkbiganalytics.spark.service.AbstractDataSetConverterService;
 import scala.Option;
-
+*/
 /*
 
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.{JavaHiveDecimalObjectInspector, PrimitiveObjectInspectorFactory}
@@ -23,6 +24,7 @@ import org.junit.{Assert, Test}
 
 public class TestObjectInspector {
 
+    /*
     IntegerType$ integerTypeSingleton = IntegerType$.MODULE$;
     ArrayType arrayOfIntsType = ArrayType$.MODULE$.apply(integerTypeSingleton);
 
@@ -52,6 +54,7 @@ public class TestObjectInspector {
         Assert.assertEquals(0, smallDecimalInspector.scale());
 
     }
+    */
 }
 
 
