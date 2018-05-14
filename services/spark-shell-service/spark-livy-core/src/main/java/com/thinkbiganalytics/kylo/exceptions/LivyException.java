@@ -35,10 +35,6 @@ public class LivyException extends RuntimeException {
         super(s, throwable);
     }
 
-    protected LivyException(String s, Throwable throwable, boolean b, boolean b1) {
-        super(s, throwable, b, b1);
-    }
-
     public LivyException(Throwable cause) {
         super(cause);
     }

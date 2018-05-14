@@ -20,9 +20,11 @@ package com.thinkbiganalytics.kylo.spark.livy;
  * #L%
  */
 
+import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementsPost;
-import com.thinkbiganalytics.kylo.model.StatementsPostResponse;
+import com.thinkbiganalytics.kylo.utils.LivyRestModelTransformer;
 import com.thinkbiganalytics.kylo.utils.ScalaScripUtils;
+import com.thinkbiganalytics.kylo.utils.TranslateStatementStateToTransformStatus;
 import com.thinkbiganalytics.rest.JerseyRestClient;
 import com.thinkbiganalytics.spark.rest.model.*;
 import com.thinkbiganalytics.spark.shell.SparkShellProcess;
@@ -69,16 +71,19 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     @Nonnull
     @Override
     public Optional<TransformResponse> getTransformResult(@Nonnull SparkShellProcess process, @Nonnull String table) {
-        // TODO:   query for results
         logger.info("getTransformResult(process,table) called");
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
-        StatementsPostResponse result = client.get(String.format("/sessions/%s/statements/0", sparkLivyProcessManager.getLivySessionId(process)),
-                StatementsPostResponse.class);
-        logger.info("getStatement id={}, result={}", 0, result);
+        Integer stmtId = sparkLivyProcessManager.getLastStatementId(process);
 
-        throw new UnsupportedOperationException();
+        Statement spr = client.get(String.format("/sessions/%s/statements/%s", sparkLivyProcessManager.getLivySessionId(process), stmtId),
+                Statement.class);
+
+        sparkLivyProcessManager.setLastStatementId( process, spr.getId() );
+        logger.info("getStatement id={}, spr={}", stmtId, spr);
+        TransformResponse response = LivyRestModelTransformer.toTransformResponse(spr);
+        return Optional.of(response);
     }
 
     @Nonnull
@@ -125,23 +130,25 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
 
-        String script = ScalaScripUtils.dataFrameToJava( request.getScript() );
+        String script = ScalaScripUtils.dataFrameToJava(request.getScript());
 
         StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
 
-        String s = client.post(String.format("/sessions/%s/statements", sparkLivyProcessManager.getLivySessionId(process)),
+        Statement statement = client.post(String.format("/sessions/%s/statements", sparkLivyProcessManager.getLivySessionId(process)),
                 sp,
-                String.class);
+                Statement.class);
 
-        logger.info("getStatements={}", s);
+        logger.info("statement={}", statement);
+        sparkLivyProcessManager.setLastStatementId(process,statement.getId());
 
         TransformResponse response = new TransformResponse();
-        response.setStatus(TransformResponse.Status.PENDING);
-        response.setProgress(0.0);
+        response.setStatus(TranslateStatementStateToTransformStatus.translate(statement.getState()));
+        response.setProgress(statement.getProgress());
+        response.setTable("noTableWhatsoever");
 
         return response;
-        //throw new UnsupportedOperationException();
     }
 
 
 }
+
