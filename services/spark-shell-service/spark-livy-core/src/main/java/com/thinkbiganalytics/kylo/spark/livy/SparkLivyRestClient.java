@@ -129,8 +129,7 @@ public class SparkLivyRestClient implements SparkShellRestClient {
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
-
-        String script = ScalaScripUtils.dataFrameToJava(request.getScript());
+        String script = ScalaScripUtils.wrapScriptForLivy(request.getScript(), request.getPageSpec());
 
         StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
 
