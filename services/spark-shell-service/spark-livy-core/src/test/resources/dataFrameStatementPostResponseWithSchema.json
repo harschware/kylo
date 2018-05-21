@@ -1,0 +1,33 @@
+{
+  "code": "import org.apache.spark.sql._\nvar d = sqlContext.sql(\"SELECT tbl10.`venueid`, tbl10.`venuename`, tbl10.`venuecity`, tbl10.`venuestate`, tbl10.`venueseats`, tbl10.`processing_dttm` AS `venues_processing_dttm` FROM `concerts`.`venues` tbl10\")\nvar e = List( d.schema.json,  d.limit(2).collect.map(x => x.toSeq) )\n%json e\n",
+  "id": 24,
+  "output": {
+    "data": {
+      "application/json": [
+        "{\"type\":\"struct\",\"fields\":[{\"name\":\"venueid\",\"type\":\"integer\",\"nullable\":true,\"metadata\":{}},{\"name\":\"venuename\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"venuecity\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"venuestate\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"venueseats\",\"type\":\"integer\",\"nullable\":true,\"metadata\":{}},{\"name\":\"venues_processing_dttm\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}",
+        [
+          [
+            1,
+            "Toyota Park",
+            "Bridgeview",
+            "IL",
+            0,
+            "1520786524754"
+          ],
+          [
+            2,
+            "Columbus Crew Stadium",
+            "Columbus",
+            "OH",
+            0,
+            "1520786524754"
+          ]
+        ]
+      ]
+    },
+    "execution_count": 24,
+    "status": "ok"
+  },
+  "progress": 1.0,
+  "state": "available"
+}
