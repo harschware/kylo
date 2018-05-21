@@ -23,7 +23,17 @@ package com.thinkbiganalytics.kylo.utils;
 import com.thinkbiganalytics.spark.rest.model.PageSpec;
 import com.thinkbiganalytics.spark.rest.model.TransformRequest;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Pattern;
+
 public class ScalaScripUtils {
+
+    // TODO: put elsewhere, cache correctly per user
+    private static Map<String, Integer> scriptCache = new HashMap<String /*script*/, Integer /*varname*/>();
+    private static Integer counter = 0;
+    private static Pattern dfPattern = Pattern.compile("^df$", Pattern.MULTILINE);
+
     private ScalaScripUtils() {
     } // static methods only
 
@@ -41,13 +51,23 @@ public class ScalaScripUtils {
         String script = request.getScript();
 
         StringBuilder sb = new StringBuilder();
-        if( request.getParent() != null ) {
-            sb.append(request.getParent().getScript());
-            sb.append("var parent = df\n\n");
+        if (request.getParent() != null) {
+            String parentScript = request.getParent().getScript();
+            Integer varCount = 0;
+            if (scriptCache.containsKey(parentScript)) {
+                varCount = scriptCache.get(parentScript);
+            } else {
+                scriptCache.put(parentScript, counter);
+                varCount = counter++;
+            }
+            sb.append("var parent = df" + varCount + "\n\n");
         } // end if
+
+        script = dfPattern.matcher(script).replaceAll("var df" + counter + " = df; df" + counter + ".cache().count()");
 
         sb.append(wrapScriptWithPaging(script, request.getPageSpec()));
         sb.append("%json dfRows\n");
+
         return sb.toString();
     }
 
@@ -72,12 +92,12 @@ public class ScalaScripUtils {
         sb.append("val lastCol = df.columns.length - 1\n");
         sb.append("val dfStartCol = if( lastCol >= ");
         sb.append(startCol);
-        sb.append( " ) " );
+        sb.append(" ) ");
         sb.append(startCol);
         sb.append(" else lastCol\n");
         sb.append("val dfStopCol = if( lastCol >= ");
         sb.append(stopCol);
-        sb.append( " ) " );
+        sb.append(" ) ");
         sb.append(stopCol);
         sb.append(" else lastCol\n");
 
@@ -89,5 +109,5 @@ public class ScalaScripUtils {
         sb.append(").map(_._1).collect.map(x => x.toSeq) )\n");
         return sb.toString();
     }
-    
+
 }
