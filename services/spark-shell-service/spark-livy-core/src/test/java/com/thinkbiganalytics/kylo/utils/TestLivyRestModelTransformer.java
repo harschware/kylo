@@ -40,29 +40,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class TestLivyRestModelTransformer {
     private static final Logger logger = LoggerFactory.getLogger(TestSerializing.class);
 
-    @Test
-    public void simpleTest() throws IOException {
-        final String json = TestUtils.getTestResourcesFileAsString("dataFrameStatementPostResponse.json");
-
-        //JSON from String to Object
-        Statement statement = new ObjectMapper().readValue(json, Statement.class);
-        logger.info("response={}", statement);
-
-        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement);
-        assertThat(response).hasFieldOrPropertyWithValue("status", TransformResponse.Status.SUCCESS );
-        assertThat(response).hasFieldOrPropertyWithValue("progress", 1.0);
-
-        TransformQueryResult tqr = response.getResults();
-        assertThat(tqr).isNotNull();
-
-        List<QueryResultColumn> cols = tqr.getColumns();
-        assertThat(cols).isNotNull();
-        QueryResultColumn dt0 = cols.get(0);
-        assertThat(dt0).hasFieldOrPropertyWithValue("dataType", "string");
-
-        List<Object> row1 = Lists.newArrayList( "1", "Toyota Park", "Bridgeview", "IL", "0", "1520786524754");
-        assertThat( tqr.getRows() ).contains(row1);
-    }
 
     @Test
     public void simpleTestWithSchema() throws IOException {
@@ -72,7 +49,7 @@ public class TestLivyRestModelTransformer {
         Statement statement = new ObjectMapper().readValue(json, Statement.class);
         logger.info("response={}", statement);
 
-        TransformResponse response = LivyRestModelTransformer.toTransformResponseWithSchema(statement);
+        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement);
         assertThat(response).hasFieldOrPropertyWithValue("status", TransformResponse.Status.SUCCESS );
         assertThat(response).hasFieldOrPropertyWithValue("progress", 1.0);
 

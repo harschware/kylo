@@ -48,19 +48,35 @@ public class ScalaScripUtils {
      * @return
      */
     public static String wrapScriptForLivy(TransformRequest request) {
+
+        String newScript;
+        if( request.isDoProfile() ) {
+            newScript = profiledDataFrame(request);
+        } else {
+            newScript = dataFrameWithSchema(request);
+        }
+
+        return newScript;
+    }
+
+    private static String profiledDataFrame(TransformRequest request) {
+        String script = request.getScript();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append( setParentVar(request) );
+        sb.append(script);
+        sb.append("val dfProf = com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkContextService,profiler,df)\n");
+        sb.append("%json dfProf\n");
+
+        return sb.toString();
+    }
+
+    private static String dataFrameWithSchema(TransformRequest request) {
         String script = request.getScript();
 
         StringBuilder sb = new StringBuilder();
         if (request.getParent() != null) {
-            String parentScript = request.getParent().getScript();
-            Integer varCount = 0;
-            if (scriptCache.containsKey(parentScript)) {
-                varCount = scriptCache.get(parentScript);
-            } else {
-                scriptCache.put(parentScript, counter);
-                varCount = counter++;
-            }
-            sb.append("var parent = df" + varCount + "\n\n");
+            sb.append( setParentVar(request) );
         } // end if
 
         script = dfPattern.matcher(script).replaceAll("var df" + counter + " = df; df" + counter + ".cache().count()");
@@ -69,6 +85,19 @@ public class ScalaScripUtils {
         sb.append("%json dfRows\n");
 
         return sb.toString();
+    }
+
+    private static String setParentVar(TransformRequest request) {
+        String parentScript = request.getParent().getScript();
+        Integer varCount;
+        if (scriptCache.containsKey(parentScript)) {
+            varCount = scriptCache.get(parentScript);
+        } else {
+            scriptCache.put(parentScript, counter);
+            varCount = counter++;
+        }
+
+        return "var parent = df" + varCount + "\n\n";
     }
 
 
@@ -110,4 +139,11 @@ public class ScalaScripUtils {
         return sb.toString();
     }
 
+    public static String getInitScript() {
+        return "import com.thinkbiganalytics.spark.dataprofiler.Profiler\n" +
+                "import com.thinkbiganalytics.spark.SparkContextService\n" +
+                "val ctx = com.thinkbiganalytics.spark.dataprofiler.core.Profiler.createSpringContext(sc, sqlContext)\n" +
+                "val profiler = ctx.getBean(classOf[Profiler])\n" +
+                "val sparkContextService = ctx.getBean(classOf[SparkContextService])\n";
+    }
 }

@@ -1,5 +1,5 @@
 {
-  "code": "import org.apache.spark.sql._\nvar d = sqlContext.sql(\"SELECT tbl10.`venueid`, tbl10.`venuename`, tbl10.`venuecity`, tbl10.`venuestate`, tbl10.`venueseats`, tbl10.`processing_dttm` AS `venues_processing_dttm` FROM `concerts`.`venues` tbl10\")\nvar e = List( d.schema.json,  d.limit(2).collect.map(x => x.toSeq) )\n%json e\n",
+  "code": "import org.apache.spark.sql._\nvar d = sqlContext.sql(\"SELECT tbl10.`venueid`, tbl10.`venuename`, tbl10.`venuecity`, tbl10.`venuestate`, tbl10.`venueseats`, tbl10.`processing_dttm` AS `venues_processing_dttm` FROM `concerts`.`venues` tbl10\")\nvar dfRows = List( d.schema.json,  d.limit(2).collect.map(x => x.toSeq) )\n%json dfRows\n",
   "id": 24,
   "output": {
     "data": {

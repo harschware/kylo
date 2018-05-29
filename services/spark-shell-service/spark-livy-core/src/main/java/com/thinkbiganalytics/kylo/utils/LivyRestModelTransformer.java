@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.common.collect.Lists;
 import com.thinkbiganalytics.discovery.model.DefaultQueryResultColumn;
 import com.thinkbiganalytics.discovery.schema.QueryResultColumn;
@@ -33,6 +32,7 @@ import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementOutputResponse;
 import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
+import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;
 import org.slf4j.Logger;
@@ -51,21 +51,34 @@ public class LivyRestModelTransformer {
     } // static methods only
 
     public static TransformResponse toTransformResponse(Statement spr) {
-        return toTransformResponseWithSchema(spr);
-    }
-
-    public static TransformResponse toTransformResponseWithSchema(Statement spr) {
         TransformResponse response = new TransformResponse();
+
+        String code = spr.getCode();
 
         TransformResponse.Status status = TranslateStatementStateToTransformStatus.translate(spr.getState());
         response.setStatus(status);
         response.setProgress(spr.getProgress());
-        if( status == TransformResponse.Status.SUCCESS ) {
-            response.setResults(toTransformQueryResultWithSchema(spr.getOutput()));
+        if (status == TransformResponse.Status.SUCCESS) {
+            if (code.endsWith("dfRows\n")) {
+                response.setResults(toTransformQueryResultWithSchema(spr.getOutput()));
+            } else {
+                response.setProfile(toTransformResponseProfileStats(spr.getOutput()));
+                response.setActualCols(1);
+                response.setActualRows(187);
+                response.setResults(emptyResult());
+            }
         }
         response.setTable("noTableWhatsoever");
 
         return response;
+    }
+
+
+    private static TransformQueryResult emptyResult() {
+        TransformQueryResult tqr = new TransformQueryResult();
+        tqr.setColumns(Lists.newArrayList());
+        tqr.setRows(Lists.newArrayList());
+        return tqr;
     }
 
     private static TransformQueryResult toTransformQueryResultWithSchema(StatementOutputResponse sor) {
@@ -159,74 +172,30 @@ public class LivyRestModelTransformer {
         return tqr;
     }
 
-
-    @Deprecated
-    private static TransformQueryResult toTransformQueryResultWithoutSchema(StatementOutputResponse sor) {
-        TransformQueryResult tqr = new TransformQueryResult();
+    private static List<OutputRow> toTransformResponseProfileStats(StatementOutputResponse sor) {
 
         JsonNode data = sor.getData();
-        logger.debug("data={}", data);
         if (sor.getStatus() != StatementOutputStatus.ok) {
-            String msg = String.format("Malfor==ent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
+            String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
                     sor.getEname(), sor.getEvalue(), sor.getTraceback());
             throw new LivyCodeException(msg);
         }
-        List<QueryResultColumn> resColumns = Lists.newArrayList();
-        tqr.setColumns(resColumns);
 
         ArrayNode json = (ArrayNode) data.get("application/json");
-        int numRows = 0;
-        List<List<Object>> rowData = Lists.newArrayListWithCapacity(resColumns.size());
+        final List<OutputRow> profileResults = Lists.newArrayList();
 
         Iterator<JsonNode> rowIter = json.elements();
         while (rowIter.hasNext()) {
-            ObjectNode row = (ObjectNode) rowIter.next();
-            if (numRows++ == 0) {
-                //  build column metadata
-                logger.debug("build column metadata");
-                ArrayNode cols = (ArrayNode) row.get("schema");
-                Iterator<JsonNode> colObjsIter = cols.elements();
+            JsonNode row = rowIter.next();
+            String columnName = row.get("columnName").asText();
+            String metricType = row.get("metricType").asText();
+            String metricValue = row.get("metricValue").asText();
+            OutputRow outputRow = new OutputRow(columnName, metricType, metricValue);
+            profileResults.add(outputRow);
+        } // end rowIter.next
 
-                int idx = 0;
-                while (colObjsIter.hasNext()) {
-                    ObjectNode colObj = (ObjectNode) colObjsIter.next();
-                    final JsonNode dataType = colObj.get("dataType");
-                    JsonNode metadata = colObj.get("metadata");
-                    String name = colObj.get("name").asText();
-                    String nullable = colObj.get("nullable").asText();  // "true"|"false"
-
-
-                    QueryResultColumn qrc = new DefaultQueryResultColumn();
-                    qrc.setDisplayName(name);
-                    qrc.setField(name);
-                    qrc.setHiveColumnLabel(name);  // not used, but still be expected to be unique
-                    qrc.setIndex(idx++);
-                    qrc.setDataType("string"); // dataType is always empty:: https://www.mail-archive.com/user@livy.incubator.apache.org/msg00262.html
-                    resColumns.add(qrc);
-                }
-            }
-
-            // get row data
-            logger.debug("build row data");
-
-            ArrayNode values = (ArrayNode) row.get("values");
-
-            List<Object> newValues = Lists.newArrayList();
-            Iterator<JsonNode> valuesIter = values.elements();
-            while (valuesIter.hasNext()) {
-                JsonNode valueNode = (JsonNode) valuesIter.next();
-                Object value = valueNode.asText();
-                newValues.add(value);
-            }
-            rowData.add(newValues);
-        }
-        logger.debug("{}", rowData);
-
-
-        tqr.setRows(rowData);
-        //tqr.setValidationResults(null);
-
-        return tqr;
+        return profileResults;
     }
+
 
 }

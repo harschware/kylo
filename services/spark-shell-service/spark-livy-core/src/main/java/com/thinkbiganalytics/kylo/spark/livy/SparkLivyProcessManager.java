@@ -23,10 +23,9 @@ package com.thinkbiganalytics.kylo.spark.livy;
 import com.google.common.collect.Lists;
 import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.exceptions.LivyServerNotReachableException;
-import com.thinkbiganalytics.kylo.model.Session;
-import com.thinkbiganalytics.kylo.model.SessionsGet;
-import com.thinkbiganalytics.kylo.model.SessionsGetResponse;
+import com.thinkbiganalytics.kylo.model.*;
 import com.thinkbiganalytics.kylo.model.enums.SessionState;
+import com.thinkbiganalytics.kylo.utils.ScalaScripUtils;
 import com.thinkbiganalytics.rest.JerseyClientConfig;
 import com.thinkbiganalytics.rest.JerseyRestClient;
 import com.thinkbiganalytics.spark.rest.model.RegistrationRequest;
@@ -40,10 +39,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Resource;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class SparkLivyProcessManager implements SparkShellProcessManager {
     private static final Logger logger = LoggerFactory.getLogger(SparkLivyProcessManager.class);
@@ -145,6 +141,10 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
         if (!currentSession.getState().equals(SessionState.idle)) {
             logger.info("Created session with id='{}', but it was returned with state != idle, state = '{}'", currentSession.getId(), currentSession.getState());
             waitForSessionToBecomeIdle(jerseyClient, currentSessionId);
+
+            // TODO: At this point the server is ready and we can send it an initialization command, any following statements
+            // TODO:    sent by UI will wait for their turn to execute
+            initSession(jerseyClient);
         } // end if
 
         if (sparkProcess != null) {
@@ -152,6 +152,22 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
                 listener.processReady(sparkProcess);
             }
         }
+    }
+
+    private void initSession(JerseyRestClient jerseyClient) {
+        String script = ScalaScripUtils.getInitScript();
+
+        StatementsPost sp = new StatementsPost.Builder()
+                .kind("spark")
+                .code(script)
+                .build();
+
+        Statement statement = jerseyClient.post(String.format("/sessions/%s/statements", getLivySessionId(sparkProcess)),
+                sp,
+                Statement.class);
+
+        logger.info("statement={}", statement);
+        setLastStatementId(sparkProcess,statement.getId());
     }
 
     public Optional<Session> getLivySession(JerseyRestClient jerseyClient) {
@@ -171,17 +187,19 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
     }
 
     public Session startLivySession(JerseyRestClient client) {
-        SessionsGet sg = new SessionsGet.Builder().build();
-        Session currentSession = null;
+        SessionsPost sessionsPost = new SessionsPost.Builder()
+                //.jars(Lists.newArrayList(""))
+                .build();
+        Session currentSession;
         try {
-            currentSession = client.post("/sessions", sg, Session.class);
+            currentSession = client.post("/sessions", sessionsPost, Session.class);
             if (currentSession == null) {
                 throw new LivyServerNotReachableException("Livy server not reachable");
             }
         } catch ( LivyException le ) {
             throw le;
         } catch( Exception e ) {
-            // "javax.ws.rs.ProcessingException: java.io.IOException: Error writing to server" on Ubuntu
+            // NOTE: you can get "javax.ws.rs.ProcessingException: java.io.IOException: Error writing to server" on Ubuntu
             throw new LivyException(e);
         }
         clientSessionCache.put(sparkProcess, currentSession.getId());

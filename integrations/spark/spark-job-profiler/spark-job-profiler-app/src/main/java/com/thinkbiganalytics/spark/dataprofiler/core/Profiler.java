@@ -27,6 +27,7 @@ import com.thinkbiganalytics.spark.SparkContextService;
 import com.thinkbiganalytics.spark.dataprofiler.ColumnStatistics;
 import com.thinkbiganalytics.spark.dataprofiler.ProfilerConfiguration;
 import com.thinkbiganalytics.spark.dataprofiler.StatisticsModel;
+import com.thinkbiganalytics.spark.dataprofiler.config.LivyProfilerConfig;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputWriter;
 import com.thinkbiganalytics.spark.policy.FieldPolicyLoader;
@@ -130,25 +131,7 @@ public class Profiler {
         profiler.run(args);
     }
 
-    /*
-     * import scala.collection.mutable._
-     * case class TestPerson(name: String, age: Long, salary: Double)
-     * val tom = TestPerson("Tom Hanks",37,35.5)
-     * val sam = TestPerson("Sam Smith",40,40.5)
-     * val PersonList = MutableList[TestPerson]()
-     * PersonList += tom
-     * PersonList += sam
-     * val personDF = PersonList.toDF()
-     * val namesDf = personDF.select("name")
-     *
-     * import com.thinkbiganalytics.spark.dataprofiler.Profiler
-     * import com.thinkbiganalytics.spark.SparkContextService
-     * val ctx = com.thinkbiganalytics.spark.dataprofiler.core.Profiler.createSpringContext(sc, sqlContext)
-     * val profiler = ctx.getBean(classOf[Profiler])
-     * val sparkContextService = ctx.getBean(classOf[SparkContextService])
-     *
-     * com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkContextService,profiler,namesDf)
-     */
+
     public static List<OutputRow> profileDataFrame(SparkContextService sparkContextService,
                                                    com.thinkbiganalytics.spark.dataprofiler.Profiler profiler,
                                                    DataFrame dataFrame) {
@@ -174,13 +157,11 @@ public class Profiler {
         return Lists.newArrayList();
     }
 
-    public static ApplicationContext createSpringContext(final SparkContext sc, final SQLContext sqlContext) {
-        // Set the static holder to the SparkContext parameter given
-        new SparkContextHolder(sc);
-        // Set the static holder to the SQLContext parameter given
-        new SqlContextHolder(sqlContext);
 
-        ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext-livy.xml");
+    public static ApplicationContext createSpringContext(final SparkContext sc, final SQLContext sqlContext) {
+        LivyProfilerConfig.setSparkContext(sc);
+        LivyProfilerConfig.setSqlContext(sqlContext);
+        ApplicationContext context = new AnnotationConfigApplicationContext(LivyProfilerConfig.class);
         return context;
     }
 
@@ -306,68 +287,4 @@ public class Profiler {
                  + "\n***");
     }
 
-    public static class SparkContextFactory implements FactoryBean<SparkContext> {
-        @Override
-        public SparkContext getObject() {
-            return SparkContextHolder.getSparkContext();
-        }
-
-        @Override
-        public Class<?> getObjectType() {
-            return SparkContext.class;
-        }
-
-        @Override
-        public boolean isSingleton() {
-            return true;
-        }
-    } // end class
-
-    public static class SparkContextHolder {
-        static SparkContext sparkContext;
-
-        public SparkContextHolder(SparkContext sparkContext) {
-            this.sparkContext = sparkContext;
-        }
-
-        public static SparkContext getSparkContext() {
-            if (sparkContext == null) {
-                throw new IllegalStateException("SparkContextHolder not initialized");
-            }
-            return sparkContext;
-        }
-    } // end class
-
-
-    public static class SqlContextFactory implements FactoryBean<SQLContext> {
-        @Override
-        public SQLContext getObject() {
-            return SqlContextHolder.getSqlContext();
-        }
-
-        @Override
-        public Class<?> getObjectType() {
-            return SQLContext.class;
-        }
-
-        @Override
-        public boolean isSingleton() {
-            return true;
-        }
-    } // end class
-
-    public static class SqlContextHolder {
-        static SQLContext sqlContext;
-
-        public SqlContextHolder(SQLContext sqlContext) {
-            this.sqlContext = sqlContext;
-        }
-
-        public static SQLContext getSqlContext() {
-            if (sqlContext == null) {
-                throw new IllegalStateException("SqlContextHolder not initialized");
-            }
-            return sqlContext;
-        }
-    } // end class
 }
