@@ -142,8 +142,8 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
             logger.info("Created session with id='{}', but it was returned with state != idle, state = '{}'", currentSession.getId(), currentSession.getState());
             waitForSessionToBecomeIdle(jerseyClient, currentSessionId);
 
-            // TODO: At this point the server is ready and we can send it an initialization command, any following statements
-            // TODO:    sent by UI will wait for their turn to execute
+            // At this point the server is ready and we can send it an initialization command, any following
+            //   statement sent by UI will wait for their turn to execute
             initSession(jerseyClient);
         } // end if
 

@@ -32,6 +32,7 @@ import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementOutputResponse;
 import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
+import com.thinkbiganalytics.spark.dataprofiler.model.MetricType;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;
@@ -61,12 +62,19 @@ public class LivyRestModelTransformer {
         if (status == TransformResponse.Status.SUCCESS) {
             if (code.endsWith("dfRows\n")) {
                 response.setResults(toTransformQueryResultWithSchema(spr.getOutput()));
-            } else {
+            } else if (code.endsWith("dfProf\n")) {
+                List<OutputRow> rows = toTransformResponseProfileStats(spr.getOutput());
                 response.setProfile(toTransformResponseProfileStats(spr.getOutput()));
                 response.setActualCols(1);
-                response.setActualRows(187);
+                Integer actualRows = rows.stream()
+                        .filter(metric -> metric.getMetricType().equals(MetricType.TOTAL_COUNT))
+                        .map(metric -> Integer.valueOf(metric.getMetricValue()))
+                        .findFirst().orElse(1);
+                response.setActualRows(actualRows);
                 response.setResults(emptyResult());
-            }
+            } else {
+                throw new LivyException("Unsupported result type requested of Livy.  Results not recognized");
+            } // end if
         }
         response.setTable("noTableWhatsoever");
 
@@ -80,6 +88,7 @@ public class LivyRestModelTransformer {
         tqr.setRows(Lists.newArrayList());
         return tqr;
     }
+
 
     private static TransformQueryResult toTransformQueryResultWithSchema(StatementOutputResponse sor) {
         TransformQueryResult tqr = new TransformQueryResult();
@@ -172,6 +181,7 @@ public class LivyRestModelTransformer {
         return tqr;
     }
 
+
     private static List<OutputRow> toTransformResponseProfileStats(StatementOutputResponse sor) {
 
         JsonNode data = sor.getData();
@@ -196,6 +206,4 @@ public class LivyRestModelTransformer {
 
         return profileResults;
     }
-
-
 }
