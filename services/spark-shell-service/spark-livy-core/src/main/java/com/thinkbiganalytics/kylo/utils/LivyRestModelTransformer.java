@@ -32,8 +32,11 @@ import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementOutputResponse;
 import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
+import com.thinkbiganalytics.kylo.model.enums.StatementState;
 import com.thinkbiganalytics.spark.dataprofiler.model.MetricType;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
+import com.thinkbiganalytics.spark.rest.model.SaveRequest;
+import com.thinkbiganalytics.spark.rest.model.SaveResponse;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;
 import org.slf4j.Logger;
@@ -51,20 +54,16 @@ public class LivyRestModelTransformer {
     private LivyRestModelTransformer() {
     } // static methods only
 
-    public static TransformResponse toTransformResponse(Statement spr) {
-        TransformResponse response = new TransformResponse();
+    public static TransformResponse toTransformResponse(Statement statement, String transformId) {
+        TransformResponse response = prepTransformResponse(statement, transformId);
 
-        String code = spr.getCode();
-
-        TransformResponse.Status status = TranslateStatementStateToTransformStatus.translate(spr.getState());
-        response.setStatus(status);
-        response.setProgress(spr.getProgress());
-        if (status == TransformResponse.Status.SUCCESS) {
+        if (response.getStatus() == TransformResponse.Status.SUCCESS) {
+            String code = statement.getCode();
             if (code.endsWith("dfRows\n")) {
-                response.setResults(toTransformQueryResultWithSchema(spr.getOutput()));
+                response.setResults(toTransformQueryResultWithSchema(statement.getOutput()));
             } else if (code.endsWith("dfProf\n")) {
-                List<OutputRow> rows = toTransformResponseProfileStats(spr.getOutput());
-                response.setProfile(toTransformResponseProfileStats(spr.getOutput()));
+                List<OutputRow> rows = toTransformResponseProfileStats(statement.getOutput());
+                response.setProfile(toTransformResponseProfileStats(statement.getOutput()));
                 response.setActualCols(1);
                 Integer actualRows = rows.stream()
                         .filter(metric -> metric.getMetricType().equals(MetricType.TOTAL_COUNT))
@@ -76,8 +75,18 @@ public class LivyRestModelTransformer {
                 throw new LivyException("Unsupported result type requested of Livy.  Results not recognized");
             } // end if
         }
-        response.setTable("noTableWhatsoever");
 
+        return response;
+    }
+
+
+    private static TransformResponse prepTransformResponse(Statement statement, String transformId) {
+        TransformResponse response = new TransformResponse();
+
+        TransformResponse.Status status = StatementStateTranslator.translate(statement.getState());
+        response.setStatus(status);
+        response.setProgress(statement.getProgress());
+        response.setTable(transformId);
         return response;
     }
 
@@ -183,14 +192,13 @@ public class LivyRestModelTransformer {
 
 
     private static List<OutputRow> toTransformResponseProfileStats(StatementOutputResponse sor) {
-
-        JsonNode data = sor.getData();
         if (sor.getStatus() != StatementOutputStatus.ok) {
             String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
                     sor.getEname(), sor.getEvalue(), sor.getTraceback());
             throw new LivyCodeException(msg);
         }
 
+        JsonNode data = sor.getData();
         ArrayNode json = (ArrayNode) data.get("application/json");
         final List<OutputRow> profileResults = Lists.newArrayList();
 
@@ -205,5 +213,39 @@ public class LivyRestModelTransformer {
         } // end rowIter.next
 
         return profileResults;
+    }
+
+    public static SaveResponse toSaveResponse(Statement statement, String transformId) {
+        SaveResponse response = new SaveResponse();
+
+        StatementOutputResponse sor = statement.getOutput();
+
+        if (sor != null && sor.getStatus() != StatementOutputStatus.ok) {
+            String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
+                    sor.getEname(), sor.getEvalue(), sor.getTraceback());
+            throw new LivyCodeException(msg);
+        }
+        // TODO: what if it were state != waiting?
+
+
+        if (statement.getState() != StatementState.available) {
+            response.setId(statement.getId().toString());
+            response.setStatus(StatementStateTranslator.translateToSaveResponse(statement.getState()));
+            return response;
+        }
+
+        JsonNode data = sor.getData();
+        if (data != null) {
+            JsonNode json = data.get("application/json");
+            String jsonString = json.asText();
+            try {
+                SaveResponse sr = mapper.readValue(jsonString, SaveResponse.class);
+                return sr;
+            } catch (IOException e) {
+                throw new LivyException("Unable to deserialize SaveResponse returned from Livy"); // TODO: specialize me
+            } // end try/catch
+        } else {
+            throw new LivyException("Unable to deserialize SaveResponse returned from Livy"); // TODO: specialize me
+        }
     }
 }

@@ -20,11 +20,16 @@ package com.thinkbiganalytics.kylo.utils;
  * #L%
  */
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.thinkbiganalytics.spark.rest.model.PageSpec;
 import com.thinkbiganalytics.spark.rest.model.TransformRequest;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 public class ScalaScripUtils {
@@ -33,6 +38,16 @@ public class ScalaScripUtils {
     private static Map<String, Integer> scriptCache = new HashMap<String /*script*/, Integer /*varname*/>();
     private static Integer counter = 0;
     private static Pattern dfPattern = Pattern.compile("^df$", Pattern.MULTILINE);
+
+
+    /**
+     * Cache of transformatIds
+     */
+    @Nonnull
+    public final static Cache<TransformRequest, String> transformCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(1, TimeUnit.HOURS)
+            .maximumSize(100)
+            .build();
 
     private ScalaScripUtils() {
     } // static methods only
@@ -79,7 +94,10 @@ public class ScalaScripUtils {
             sb.append( setParentVar(request) );
         } // end if
 
-        script = dfPattern.matcher(script).replaceAll("var df" + counter + " = df; df" + counter + ".cache().count()");
+        String transformId = ScalaScripUtils.newTableName();
+        transformCache.put(request,transformId);
+        script = dfPattern.matcher(script).replaceAll("var df" + counter + " = df; df" + counter + ".cache()" +
+                ".registerTempTable( \"" + transformId + "\" )\n");
 
         sb.append(wrapScriptWithPaging(script, request.getPageSpec()));
         sb.append("%json dfRows\n");
@@ -113,37 +131,60 @@ public class ScalaScripUtils {
     private static String wrapScriptWithPaging(String script, PageSpec pageSpec) {
         StringBuilder sb = new StringBuilder(script);
 
-        Integer startCol = pageSpec.getFirstCol();
-        Integer stopCol = pageSpec.getFirstCol() + pageSpec.getNumCols();
-        Integer startRow = pageSpec.getFirstRow();
-        Integer stopRow = pageSpec.getFirstRow() + pageSpec.getNumRows();
+        if( pageSpec != null ) {
+            Integer startCol = pageSpec.getFirstCol();
+            Integer stopCol = pageSpec.getFirstCol() + pageSpec.getNumCols();
+            Integer startRow = pageSpec.getFirstRow();
+            Integer stopRow = pageSpec.getFirstRow() + pageSpec.getNumRows();
 
-        sb.append("val lastCol = df.columns.length - 1\n");
-        sb.append("val dfStartCol = if( lastCol >= ");
-        sb.append(startCol);
-        sb.append(" ) ");
-        sb.append(startCol);
-        sb.append(" else lastCol\n");
-        sb.append("val dfStopCol = if( lastCol >= ");
-        sb.append(stopCol);
-        sb.append(" ) ");
-        sb.append(stopCol);
-        sb.append(" else lastCol\n");
+            sb.append("val lastCol = df.columns.length - 1\n");
+            sb.append("val dfStartCol = if( lastCol >= ");
+            sb.append(startCol);
+            sb.append(" ) ");
+            sb.append(startCol);
+            sb.append(" else lastCol\n");
+            sb.append("val dfStopCol = if( lastCol >= ");
+            sb.append(stopCol);
+            sb.append(" ) ");
+            sb.append(stopCol);
+            sb.append(" else lastCol\n");
 
-        sb.append("df = df.select( dfStartCol to dfStopCol map df.columns map col: _*)\n");
-        sb.append("val dfRows = List( df.schema.json, df.rdd.zipWithIndex.filter( pair => pair._2>=");
-        sb.append(startRow);
-        sb.append(" && pair._2<=");
-        sb.append(stopRow);
-        sb.append(").map(_._1).collect.map(x => x.toSeq) )\n");
+            sb.append("df = df.select( dfStartCol to dfStopCol map df.columns map col: _*)\n");
+            sb.append("val dfRows = List( df.schema.json, df.rdd.zipWithIndex.filter( pair => pair._2>=");
+            sb.append(startRow);
+            sb.append(" && pair._2<=");
+            sb.append(stopRow);
+            sb.append(").map(_._1).collect.map(x => x.toSeq) )\n");
+        } else {
+            sb.append("val dfRows = df\n");
+        }
         return sb.toString();
     }
 
     public static String getInitScript() {
-        return "import com.thinkbiganalytics.spark.dataprofiler.Profiler\n" +
-                "import com.thinkbiganalytics.spark.SparkContextService\n" +
-                "val ctx = com.thinkbiganalytics.spark.dataprofiler.core.Profiler.createSpringContext(sc, sqlContext)\n" +
-                "val profiler = ctx.getBean(classOf[Profiler])\n" +
-                "val sparkContextService = ctx.getBean(classOf[SparkContextService])\n";
+        return "val ctx = com.thinkbiganalytics.spark.LivyWrangler.createSpringContext(sc, sqlContext)\n" +
+                "val profiler = ctx.getBean(classOf[com.thinkbiganalytics.spark.dataprofiler.Profiler])\n" +
+                "val transformService = ctx.getBean(classOf[com.thinkbiganalytics.spark.service.TransformService])\n" +
+                "val sparkContextService = ctx.getBean(classOf[com.thinkbiganalytics.spark.SparkContextService])\n" +
+                "val converterService = ctx.getBean(classOf[com.thinkbiganalytics.spark.service.DataSetConverterService])\n" +
+                "val sparkShellTransformController = ctx.getBean(classOf[com.thinkbiganalytics.spark.rest.SparkShellTransformController])\n" +
+                "val mapper = new com.fasterxml.jackson.databind.ObjectMapper()\n";
     }
+
+    /**
+     * Generates a new, unique table name.
+     *
+     * @return the table name
+     * @throws IllegalStateException if a table name cannot be generated
+     */
+    public static String newTableName() {
+        for (int i = 0; i < 100; ++i) {
+            final String name = UUID.randomUUID().toString();
+            if (name.matches("^[a-fA-F].*")) {
+                return name.replace("-", "");
+            }
+        }
+        throw new IllegalStateException("Unable to generate a new table name");
+    }
+
 }

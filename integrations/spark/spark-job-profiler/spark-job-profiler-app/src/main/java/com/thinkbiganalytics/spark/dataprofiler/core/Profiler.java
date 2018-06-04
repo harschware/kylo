@@ -31,7 +31,6 @@ import com.thinkbiganalytics.spark.dataprofiler.config.LivyProfilerConfig;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputWriter;
 import com.thinkbiganalytics.spark.policy.FieldPolicyLoader;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.spark.SparkContext;
 import org.apache.spark.sql.Column;
@@ -39,18 +38,15 @@ import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.SQLContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.FactoryBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.support.ClassPathXmlApplicationContext;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Generate data profile statistics for a table/query, and write result to a table
@@ -117,10 +113,9 @@ public class Profiler {
     }
 
     // should be called from spark REPL like this:
-    // spark-shell --master local --conf spark.network.timeout=120s --conf spark.executor.cores=1 --conf spark.executor.instances=1 --conf spark.executor.memory=512m --conf spark.driver.memory=1024m --jars /root/git/scala-profile-app/target/scala-profile-app-1.0-SNAPSHOT-jar-with-dependencies.jar
-    // spark> import harschware.sandbox.drivers.LivyProfiler
+    // spark-shell --master local --conf spark.network.timeout=120s --conf spark.executor.cores=1 --conf spark.executor.instances=1 --conf spark.executor.memory=512m --conf spark.driver.memory=1024m --jars <SNIP>/kylo/integrations/spark/spark-job-profiler/spark-job-profiler-app/target/kylo-spark-job-profiler-app-0.9.1-SNAPSHOT.jar
     // spark> val exampleArgs = Array("table", "system.userdata1_valid", "10", "system.userdata1_profile", "/tmp/userdata1_field_policy.json", "1526946300553");
-    // spark> LivyProfiler.runProfiler( sc, sqlContext, exampleArgs )
+    // spark> Profiler.runProfiler( sc, sqlContext, exampleArgs )
     public static void runProfiler(SparkContext sc, SQLContext sqlContext, String [] args ) {
         ApplicationContext ctx = createSpringContext(sc, sqlContext);
 
