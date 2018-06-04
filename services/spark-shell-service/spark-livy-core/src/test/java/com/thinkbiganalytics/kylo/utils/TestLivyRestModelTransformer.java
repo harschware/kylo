@@ -49,7 +49,7 @@ public class TestLivyRestModelTransformer {
         Statement statement = new ObjectMapper().readValue(json, Statement.class);
         logger.info("response={}", statement);
 
-        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement);
+        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement, "testTableName");
         assertThat(response).hasFieldOrPropertyWithValue("status", TransformResponse.Status.SUCCESS );
         assertThat(response).hasFieldOrPropertyWithValue("progress", 1.0);
 

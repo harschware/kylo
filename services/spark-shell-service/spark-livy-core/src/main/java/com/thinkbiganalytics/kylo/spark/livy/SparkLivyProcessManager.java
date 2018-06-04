@@ -20,7 +20,9 @@ package com.thinkbiganalytics.kylo.spark.livy;
  * #L%
  */
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.exceptions.LivyServerNotReachableException;
 import com.thinkbiganalytics.kylo.model.*;
@@ -189,7 +191,10 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
     public Session startLivySession(JerseyRestClient client) {
         SessionsPost sessionsPost = new SessionsPost.Builder()
                 //.jars(Lists.newArrayList(""))
-                .build();
+                .conf(ImmutableMap.of(
+                       // "spark.driver.extraJavaOptions", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8990"
+                )).build();
+
         Session currentSession;
         try {
             currentSession = client.post("/sessions", sessionsPost, Session.class);

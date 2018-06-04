@@ -1,4 +1,4 @@
-package com.thinkbiganalytics.spark;
+package com.thinkbiganalytics.spark2;
 
 /*-
  * #%L
@@ -28,6 +28,9 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Lists;
 import com.thinkbiganalytics.security.core.SecurityCoreConfig;
+import com.thinkbiganalytics.spark.RemoteClientRunner;
+import com.thinkbiganalytics.spark.SparkContextService;
+import com.thinkbiganalytics.spark.SparkShellOptions;
 import com.thinkbiganalytics.spark.dataprofiler.Profiler;
 import com.thinkbiganalytics.spark.datavalidator.DataValidator;
 import com.thinkbiganalytics.spark.metadata.TransformScript;
