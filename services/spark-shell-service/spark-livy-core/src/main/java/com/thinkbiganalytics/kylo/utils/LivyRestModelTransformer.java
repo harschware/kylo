@@ -60,7 +60,7 @@ public class LivyRestModelTransformer {
             String code = statement.getCode();
             if (code.endsWith("dfRows\n")) {
                 response.setResults(toTransformQueryResultWithSchema(statement.getOutput()));
-            } else if (code.endsWith("dfProf\n")) {
+            } else if (code.endsWith("dfProf")) {
                 List<OutputRow> rows = toTransformResponseProfileStats(statement.getOutput());
                 response.setProfile(toTransformResponseProfileStats(statement.getOutput()));
                 response.setActualCols(1);
