@@ -26,31 +26,31 @@ import com.thinkbiganalytics.spark.rest.model.PageSpec;
 import com.thinkbiganalytics.spark.rest.model.TransformRequest;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Resource;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-public class ScalaScripUtils {
+public class ScalaScriptService {
 
     // TODO: put elsewhere, cache correctly per user
     private static Map<String, Integer> scriptCache = new HashMap<String /*script*/, Integer /*varname*/>();
     private static Integer counter = 0;
     private static Pattern dfPattern = Pattern.compile("^df$", Pattern.MULTILINE);
 
+    @Resource
+    private ScriptGenerator scriptGenerator;
 
     /**
-     * Cache of transformatIds
+     * Cache of transformIds
      */
     @Nonnull
     public final static Cache<TransformRequest, String> transformCache = CacheBuilder.newBuilder()
             .expireAfterAccess(1, TimeUnit.HOURS)
             .maximumSize(100)
             .build();
-
-    private ScalaScripUtils() {
-    } // static methods only
 
 
     /**
@@ -62,11 +62,11 @@ public class ScalaScripUtils {
      * @param request
      * @return
      */
-    public static String wrapScriptForLivy(TransformRequest request) {
+    public String wrapScriptForLivy(TransformRequest request) {
 
         String newScript;
         if( request.isDoProfile() ) {
-            newScript = profiledDataFrame(request);
+            newScript = scriptGenerator.script("profileDataFrame", setParentVar(request) );
         } else {
             newScript = dataFrameWithSchema(request);
         }
@@ -74,19 +74,7 @@ public class ScalaScripUtils {
         return newScript;
     }
 
-    private static String profiledDataFrame(TransformRequest request) {
-        String script = request.getScript();
-
-        StringBuilder sb = new StringBuilder();
-        sb.append( setParentVar(request) );
-        sb.append(script);
-        sb.append("val dfProf = com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkContextService,profiler,df)\n");
-        sb.append("%json dfProf\n");
-
-        return sb.toString();
-    }
-
-    private static String dataFrameWithSchema(TransformRequest request) {
+    private String dataFrameWithSchema(TransformRequest request) {
         String script = request.getScript();
 
         StringBuilder sb = new StringBuilder();
@@ -94,7 +82,7 @@ public class ScalaScripUtils {
             sb.append( setParentVar(request) );
         } // end if
 
-        String transformId = ScalaScripUtils.newTableName();
+        String transformId = ScalaScriptService.newTableName();
         transformCache.put(request,transformId);
         script = dfPattern.matcher(script).replaceAll("var df" + counter + " = df; df" + counter + ".cache()" +
                 ".registerTempTable( \"" + transformId + "\" )\n");
@@ -105,18 +93,6 @@ public class ScalaScripUtils {
         return sb.toString();
     }
 
-    private static String setParentVar(TransformRequest request) {
-        String parentScript = request.getParent().getScript();
-        Integer varCount;
-        if (scriptCache.containsKey(parentScript)) {
-            varCount = scriptCache.get(parentScript);
-        } else {
-            scriptCache.put(parentScript, counter);
-            varCount = counter++;
-        }
-
-        return "var parent = df" + varCount + "\n\n";
-    }
 
 
     /**
@@ -128,48 +104,20 @@ public class ScalaScripUtils {
      * @param pageSpec
      * @return
      */
-    private static String wrapScriptWithPaging(String script, PageSpec pageSpec) {
-        StringBuilder sb = new StringBuilder(script);
-
+    private String wrapScriptWithPaging(String script, PageSpec pageSpec) {
         if( pageSpec != null ) {
             Integer startCol = pageSpec.getFirstCol();
             Integer stopCol = pageSpec.getFirstCol() + pageSpec.getNumCols();
             Integer startRow = pageSpec.getFirstRow();
             Integer stopRow = pageSpec.getFirstRow() + pageSpec.getNumRows();
 
-            sb.append("val lastCol = df.columns.length - 1\n");
-            sb.append("val dfStartCol = if( lastCol >= ");
-            sb.append(startCol);
-            sb.append(" ) ");
-            sb.append(startCol);
-            sb.append(" else lastCol\n");
-            sb.append("val dfStopCol = if( lastCol >= ");
-            sb.append(stopCol);
-            sb.append(" ) ");
-            sb.append(stopCol);
-            sb.append(" else lastCol\n");
-
-            sb.append("df = df.select( dfStartCol to dfStopCol map df.columns map col: _*)\n");
-            sb.append("val dfRows = List( df.schema.json, df.rdd.zipWithIndex.filter( pair => pair._2>=");
-            sb.append(startRow);
-            sb.append(" && pair._2<=");
-            sb.append(stopRow);
-            sb.append(").map(_._1).collect.map(x => x.toSeq) )\n");
+            return scriptGenerator.wrappedScript("pagedDataFrame", script, "\n",
+                    startCol,stopCol,startRow,stopRow);
         } else {
-            sb.append("val dfRows = df\n");
+            return script.concat("val dfRows = df\n");
         }
-        return sb.toString();
     }
 
-    public static String getInitScript() {
-        return "val ctx = com.thinkbiganalytics.spark.LivyWrangler.createSpringContext(sc, sqlContext)\n" +
-                "val profiler = ctx.getBean(classOf[com.thinkbiganalytics.spark.dataprofiler.Profiler])\n" +
-                "val transformService = ctx.getBean(classOf[com.thinkbiganalytics.spark.service.TransformService])\n" +
-                "val sparkContextService = ctx.getBean(classOf[com.thinkbiganalytics.spark.SparkContextService])\n" +
-                "val converterService = ctx.getBean(classOf[com.thinkbiganalytics.spark.service.DataSetConverterService])\n" +
-                "val sparkShellTransformController = ctx.getBean(classOf[com.thinkbiganalytics.spark.rest.SparkShellTransformController])\n" +
-                "val mapper = new com.fasterxml.jackson.databind.ObjectMapper()\n";
-    }
 
     /**
      * Generates a new, unique table name.
@@ -187,4 +135,17 @@ public class ScalaScripUtils {
         throw new IllegalStateException("Unable to generate a new table name");
     }
 
+
+    private static String setParentVar(TransformRequest request) {
+        String parentScript = request.getParent().getScript();
+        Integer varCount;
+        if (scriptCache.containsKey(parentScript)) {
+            varCount = scriptCache.get(parentScript);
+        } else {
+            scriptCache.put(parentScript, counter);
+            varCount = counter++;
+        }
+
+        return "var parent = df" + varCount + "\n\n";
+    }
 }

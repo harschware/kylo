@@ -22,12 +22,12 @@ package com.thinkbiganalytics.kylo.spark.livy;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.exceptions.LivyServerNotReachableException;
 import com.thinkbiganalytics.kylo.model.*;
 import com.thinkbiganalytics.kylo.model.enums.SessionState;
-import com.thinkbiganalytics.kylo.utils.ScalaScripUtils;
+import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
+import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.rest.JerseyClientConfig;
 import com.thinkbiganalytics.rest.JerseyRestClient;
 import com.thinkbiganalytics.spark.rest.model.RegistrationRequest;
@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Resource;
-import java.io.IOException;
 import java.util.*;
 
 public class SparkLivyProcessManager implements SparkShellProcessManager {
@@ -49,6 +48,9 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
     List<SparkShellProcessListener> listeners = Lists.newArrayList();
 
     SparkShellProcess sparkProcess = SparkLivyProcess.newInstance();
+
+    @Resource
+    private ScriptGenerator scriptGenerator;
 
     /**
      * Map of Spark Shell processes to Jersey REST clients
@@ -61,7 +63,6 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
 
     @Nonnull
     private final Map<Integer, Integer> stmntIdCache = new HashMap<>();
-
 
     @Resource
     private SparkShellRestClient restClient;
@@ -157,7 +158,7 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
     }
 
     private void initSession(JerseyRestClient jerseyClient) {
-        String script = ScalaScripUtils.getInitScript();
+        String script = scriptGenerator.script("initSession");
 
         StatementsPost sp = new StatementsPost.Builder()
                 .kind("spark")

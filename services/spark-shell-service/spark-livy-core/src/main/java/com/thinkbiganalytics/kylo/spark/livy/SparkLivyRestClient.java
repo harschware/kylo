@@ -24,7 +24,8 @@ import com.google.common.collect.Lists;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementsPost;
 import com.thinkbiganalytics.kylo.utils.LivyRestModelTransformer;
-import com.thinkbiganalytics.kylo.utils.ScalaScripUtils;
+import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
+import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.kylo.utils.StatementStateTranslator;
 import com.thinkbiganalytics.rest.JerseyRestClient;
 import com.thinkbiganalytics.spark.rest.model.*;
@@ -41,9 +42,14 @@ import java.util.Optional;
 public class SparkLivyRestClient implements SparkShellRestClient {
     private static final Logger logger = LoggerFactory.getLogger(SparkLivyRestClient.class);
 
-
     @Resource
     private SparkLivyProcessManager sparkLivyProcessManager;
+
+    @Resource
+    private ScriptGenerator scriptGenerator;
+
+    @Resource
+    private ScalaScriptService scalaScriptService;
 
     @Nonnull
     @Override
@@ -113,12 +119,9 @@ public class SparkLivyRestClient implements SparkShellRestClient {
             logger.info("getStatement id={}, spr={}", stmtId, statement);
             SaveResponse response = LivyRestModelTransformer.toSaveResponse(statement, transformId);
             return Optional.of(response);
-        } catch( NumberFormatException nfe ) {
+        } catch (NumberFormatException nfe) {
             // saveId is not an integer.  We have already processed Livy Response
-            String script = "val response = sparkShellTransformController.getSave(\"" + saveId + "\");\n" +
-                    "val saveResponse =  response.getEntity().asInstanceOf[com.thinkbiganalytics.spark.rest.model.SaveResponse]\n" +
-                    "val sr = mapper.writeValueAsString(saveResponse)\n" +
-                    "%json sr\n";
+            String script = scriptGenerator.script("getSave", saveId);
 
             StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
 
@@ -152,23 +155,14 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     @Nonnull
     @Override
     public SaveResponse saveTransform(@Nonnull SparkShellProcess process, @Nonnull String transformId, @Nonnull SaveRequest request) {
-        // TODO: fix me
         logger.info("saveTransform(process,id,saveRequest) called");
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
-        String makeRequest = "val sr: com.thinkbiganalytics.spark.rest.model.SaveRequest = new com.thinkbiganalytics.spark.rest.model.SaveRequest()\n" +
-                "sr.setFormat(\"" + request.getFormat() + "\")\n" +
-                "sr.setJdbc(null)\n" +
-                "sr.setMode(\"" + request.getMode() + "\")\n" +
-                "sr.setOptions(new java.util.HashMap[String,String])\n" +
-                "sr.setTableName(\"" + request.getTableName() + "\")\n";
-        String script = makeRequest +
-                "val t" + transformId + "= sqlContext.sql(\"select * from " + transformId + "\")\n" +
-                "val dataSet = sparkContextService.toDataSet(t" + transformId + ")\n" +
-                "val saveResponse = transformService.submitSaveJob(transformService.createSaveTask(sr, new com.thinkbiganalytics.spark.metadata.ShellTransformStage(dataSet, converterService)))\n" +
-                "val sr = mapper.writeValueAsString(saveResponse)\n" +
-                "%json sr";
+
+        String makeRequest = scriptGenerator.wrappedScript("newSaveRequest", "", "\n", request.getFormat(),
+                request.getMode(), request.getTableName());
+        String script = scriptGenerator.wrappedScript("submitSaveJob", makeRequest, "\n", transformId);
 
         StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
 
@@ -189,18 +183,12 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     @Nonnull
     @Override
     public TransformResponse transform(@Nonnull SparkShellProcess process, @Nonnull TransformRequest request) {
-        /*try {
-            return getClient(process).post(TRANSFORM_PATH, request, TransformResponse.class);
-        } catch (final InternalServerErrorException e) {
-            throw propagateTransform(e);
-        } */
-
         logger.info("transform(process,request) called");
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
         // a tablename will be calculated for the request
-        String script = ScalaScripUtils.wrapScriptForLivy(request);
+        String script = scalaScriptService.wrapScriptForLivy(request);
 
         StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
 
@@ -215,11 +203,9 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         response.setStatus(StatementStateTranslator.translate(statement.getState()));
         response.setProgress(statement.getProgress());
 
-        response.setTable(ScalaScripUtils.transformCache.getIfPresent(request));
+        response.setTable(scalaScriptService.transformCache.getIfPresent(request));
 
         return response;
     }
 
-
 }
-
