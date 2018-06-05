@@ -35,7 +35,6 @@ import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
 import com.thinkbiganalytics.kylo.model.enums.StatementState;
 import com.thinkbiganalytics.spark.dataprofiler.model.MetricType;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
-import com.thinkbiganalytics.spark.rest.model.SaveRequest;
 import com.thinkbiganalytics.spark.rest.model.SaveResponse;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;

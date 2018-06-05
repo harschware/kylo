@@ -23,14 +23,18 @@ package com.thinkbiganalytics.kylo.config;
 import com.thinkbiganalytics.kylo.spark.conf.KerberosSparkProperties;
 import com.thinkbiganalytics.kylo.spark.livy.SparkLivyProcessManager;
 import com.thinkbiganalytics.kylo.spark.livy.SparkLivyRestClient;
+import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
+import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.spark.shell.SparkShellRestClient;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportResource;
 import org.springframework.context.annotation.PropertySource;
 
 @Configuration
 @PropertySource("classpath:spark.properties")
+@ImportResource("classpath:/config/applicationContext-livy.xml")
 public class SparkLivyConfig {
 
     /**
@@ -61,5 +65,16 @@ public class SparkLivyConfig {
     public SparkLivyProcessManager sparkShellProcessManager() {
         return new SparkLivyProcessManager();
     }
+
+    @Bean
+    public ScriptGenerator scriptGenerator() {
+        return new ScriptGenerator();
+    }
+
+    @Bean
+    public ScalaScriptService scalaScriptService() {
+        return new ScalaScriptService();
+    }
+
 
 }

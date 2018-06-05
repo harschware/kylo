@@ -1,0 +1,112 @@
+<?xml version = "1.0" encoding = "UTF-8"?>
+<!--
+  #%L
+  kylo-spark-livy-core
+  %%
+  Copyright (C) 2017 - 2018 ThinkBig Analytics, a Teradata Company
+  %%
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+  #L%
+-->
+
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans-4.2.xsd">
+
+
+    <bean id="scriptRegistry" class="java.util.HashMap">
+        <constructor-arg>
+            <map key-type="java.lang.String" value-type="java.lang.String">
+                <entry key="newSaveRequest">
+                    <value>
+                        <![CDATA[                        
+val saveRequest: com.thinkbiganalytics.spark.rest.model.SaveRequest = new
+com.thinkbiganalytics.spark.rest.model.SaveRequest()
+saveRequest.setFormat("%s")
+saveRequest.setJdbc(null)
+saveRequest.setMode("%s")
+saveRequest.setOptions(new java.util.HashMap[String,String])
+saveRequest.setTableName("%s")
+                        ]]>
+                    </value>
+                </entry>
+                <entry key="submitSaveJob">
+                    <value>
+                        <![CDATA[
+val dataSet = sparkContextService.toDataSet(sqlContext.sql("select * from %s"))
+val saveResponse = transformService.submitSaveJob(transformService.createSaveTask(saveRequest,
+    new com.thinkbiganalytics.spark.metadata.ShellTransformStage(dataSet, converterService)))
+val respAsStr = mapper.writeValueAsString(saveResponse)
+%%json respAsStr
+                        ]]>
+                    </value>
+                </entry>
+                <entry key="getSave">
+                    <value>
+                        <![CDATA[
+val response = sparkShellTransformController.getSave("%s")
+val saveResponse =
+response.getEntity().asInstanceOf[com.thinkbiganalytics.spark.rest.model.SaveResponse]
+val respAsStr = mapper.writeValueAsString(saveResponse)
+%%json respAsStr
+                        ]]>
+                    </value>
+                </entry>
+                <entry key="profileDataFrame">
+                    <value>
+                        <![CDATA[
+val dfProf =
+com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkContextService,profiler,df)
+%%json dfProf
+                        ]]>
+                    </value>
+                </entry>
+                <entry key="initSession">
+                    <value>
+                        <![CDATA[
+val ctx = com.thinkbiganalytics.spark.LivyWrangler.createSpringContext(sc, sqlContext)
+val profiler = ctx.getBean(classOf[com.thinkbiganalytics.spark.dataprofiler.Profiler])
+val transformService =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.service.TransformService])
+val sparkContextService = ctx.getBean(classOf[com.thinkbiganalytics.spark.SparkContextService])
+val converterService =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.service.DataSetConverterService])
+val sparkShellTransformController =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.rest.SparkShellTransformController])
+val mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                        ]]>
+                    </value>
+                </entry>
+
+                <entry key="pagedDataFrame">
+                    <value>
+                        <![CDATA[
+val (startCol, stopCol) = (%s, %s);
+val lastCol = df.columns.length - 1
+val dfStartCol = if( lastCol >= startCol ) startCol else lastCol
+val dfStopCol = if( lastCol >= stopCol) stopCol else lastCol
+df = df.select( dfStartCol to dfStopCol map df.columns map col: _*)
+
+val (startRow, stopRow) = (%s, %s);
+val dfRows = List( df.schema.json, df.rdd.zipWithIndex.filter( pair => pair._2>= startRow  && pair._2<= stopRow)
+    .map(_._1).collect.map(x => x.toSeq) )
+                        ]]>
+                    </value>
+                </entry>
+            </map>
+        </constructor-arg>
+    </bean>
+
+</beans>
