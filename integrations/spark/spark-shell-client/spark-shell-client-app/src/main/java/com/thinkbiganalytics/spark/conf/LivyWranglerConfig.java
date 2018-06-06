@@ -385,5 +385,8 @@ public class LivyWranglerConfig {
         return excludes;
     }
 
-
+    @Bean
+    public SparkUtilityService sparkUtilityService() {
+        return new SparkUtilityService();
+    }
 }

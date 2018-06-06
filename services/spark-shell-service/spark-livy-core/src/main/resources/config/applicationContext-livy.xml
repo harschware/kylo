@@ -29,16 +29,34 @@
     <bean id="scriptRegistry" class="java.util.HashMap">
         <constructor-arg>
             <map key-type="java.lang.String" value-type="java.lang.String">
+                <entry key="initSession">
+                    <value>
+                        <![CDATA[
+val ctx = com.thinkbiganalytics.spark.LivyWrangler.createSpringContext(sc, sqlContext)
+val profiler = ctx.getBean(classOf[com.thinkbiganalytics.spark.dataprofiler.Profiler])
+val transformService =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.service.TransformService])
+val sparkContextService = ctx.getBean(classOf[com.thinkbiganalytics.spark.SparkContextService])
+val converterService =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.service.DataSetConverterService])
+val sparkShellTransformController =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.rest.SparkShellTransformController])
+val mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+val sparkUtilityService =
+ctx.getBean(classOf[com.thinkbiganalytics.spark.service.SparkUtilityService])
+                        ]]>
+                    </value>
+                </entry>
                 <entry key="newSaveRequest">
                     <value>
                         <![CDATA[                        
 val saveRequest: com.thinkbiganalytics.spark.rest.model.SaveRequest = new
 com.thinkbiganalytics.spark.rest.model.SaveRequest()
-saveRequest.setFormat("%s")
+saveRequest.setFormat(%s)
 saveRequest.setJdbc(null)
-saveRequest.setMode("%s")
+saveRequest.setMode(%s)
 saveRequest.setOptions(new java.util.HashMap[String,String])
-saveRequest.setTableName("%s")
+saveRequest.setTableName(%s)
                         ]]>
                     </value>
                 </entry>
@@ -73,22 +91,7 @@ com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkCon
                         ]]>
                     </value>
                 </entry>
-                <entry key="initSession">
-                    <value>
-                        <![CDATA[
-val ctx = com.thinkbiganalytics.spark.LivyWrangler.createSpringContext(sc, sqlContext)
-val profiler = ctx.getBean(classOf[com.thinkbiganalytics.spark.dataprofiler.Profiler])
-val transformService =
-ctx.getBean(classOf[com.thinkbiganalytics.spark.service.TransformService])
-val sparkContextService = ctx.getBean(classOf[com.thinkbiganalytics.spark.SparkContextService])
-val converterService =
-ctx.getBean(classOf[com.thinkbiganalytics.spark.service.DataSetConverterService])
-val sparkShellTransformController =
-ctx.getBean(classOf[com.thinkbiganalytics.spark.rest.SparkShellTransformController])
-val mapper = new com.fasterxml.jackson.databind.ObjectMapper()
-                        ]]>
-                    </value>
-                </entry>
+
 
                 <entry key="pagedDataFrame">
                     <value>
@@ -102,6 +105,17 @@ df = df.select( dfStartCol to dfStopCol map df.columns map col: _*)
 val (startRow, stopRow) = (%s, %s);
 val dfRows = List( df.schema.json, df.rdd.zipWithIndex.filter( pair => pair._2>= startRow  && pair._2<= stopRow)
     .map(_._1).collect.map(x => x.toSeq) )
+                        ]]>
+                    </value>
+                </entry>
+
+                <entry key="getDataSources">
+                    <value>
+                        <![CDATA[
+val dataSources = sparkUtilityService.getDataSources()
+
+val respAsStr = mapper.writeValueAsString(dataSources)
+%%json respAsStr
                         ]]>
                     </value>
                 </entry>

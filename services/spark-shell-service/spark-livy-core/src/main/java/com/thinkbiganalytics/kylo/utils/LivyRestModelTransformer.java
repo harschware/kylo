@@ -29,12 +29,14 @@ import com.thinkbiganalytics.discovery.model.DefaultQueryResultColumn;
 import com.thinkbiganalytics.discovery.schema.QueryResultColumn;
 import com.thinkbiganalytics.kylo.exceptions.LivyCodeException;
 import com.thinkbiganalytics.kylo.exceptions.LivyException;
+import com.thinkbiganalytics.kylo.exceptions.LivySerializationException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementOutputResponse;
 import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
 import com.thinkbiganalytics.kylo.model.enums.StatementState;
 import com.thinkbiganalytics.spark.dataprofiler.model.MetricType;
 import com.thinkbiganalytics.spark.dataprofiler.output.OutputRow;
+import com.thinkbiganalytics.spark.rest.model.DataSources;
 import com.thinkbiganalytics.spark.rest.model.SaveResponse;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;
@@ -99,14 +101,11 @@ public class LivyRestModelTransformer {
 
 
     private static TransformQueryResult toTransformQueryResultWithSchema(StatementOutputResponse sor) {
+        checkCodeWasWellFormed(sor);
+
         TransformQueryResult tqr = new TransformQueryResult();
 
         JsonNode data = sor.getData();
-        if (sor.getStatus() != StatementOutputStatus.ok) {
-            String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
-                    sor.getEname(), sor.getEvalue(), sor.getTraceback());
-            throw new LivyCodeException(msg);
-        }
         List<QueryResultColumn> resColumns = Lists.newArrayList();
         tqr.setColumns(resColumns);
 
@@ -191,11 +190,7 @@ public class LivyRestModelTransformer {
 
 
     private static List<OutputRow> toTransformResponseProfileStats(StatementOutputResponse sor) {
-        if (sor.getStatus() != StatementOutputStatus.ok) {
-            String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
-                    sor.getEname(), sor.getEvalue(), sor.getTraceback());
-            throw new LivyCodeException(msg);
-        }
+        checkCodeWasWellFormed(sor);
 
         JsonNode data = sor.getData();
         ArrayNode json = (ArrayNode) data.get("application/json");
@@ -214,37 +209,54 @@ public class LivyRestModelTransformer {
         return profileResults;
     }
 
-    public static SaveResponse toSaveResponse(Statement statement, String transformId) {
-        SaveResponse response = new SaveResponse();
+    public static SaveResponse toSaveResponse(Statement statement) {
 
         StatementOutputResponse sor = statement.getOutput();
 
-        if (sor != null && sor.getStatus() != StatementOutputStatus.ok) {
-            String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
-                    sor.getEname(), sor.getEvalue(), sor.getTraceback());
-            throw new LivyCodeException(msg);
-        }
-        // TODO: what if it were state != waiting?
-
+        checkCodeWasWellFormed(sor);
 
         if (statement.getState() != StatementState.available) {
+            SaveResponse response = new SaveResponse();
             response.setId(statement.getId().toString());
             response.setStatus(StatementStateTranslator.translateToSaveResponse(statement.getState()));
             return response;
         }
+
+        return serializeStatementOutputResponse(sor, SaveResponse.class);
+    }
+
+    public static DataSources toDataSources(Statement statement) {
+        StatementOutputResponse sor = statement.getOutput();
+        checkCodeWasWellFormed(sor);
+
+        return serializeStatementOutputResponse(sor, DataSources.class);
+    }
+
+    private static <T extends Object> T serializeStatementOutputResponse(StatementOutputResponse sor, Class<T> clazz) {
+        String errMsg = String.format("Unable to deserialize %s returned from Livy", clazz.getSimpleName());
 
         JsonNode data = sor.getData();
         if (data != null) {
             JsonNode json = data.get("application/json");
             String jsonString = json.asText();
             try {
-                SaveResponse sr = mapper.readValue(jsonString, SaveResponse.class);
-                return sr;
+                T clazzInstance = mapper.readValue(jsonString, clazz);
+                return clazzInstance;
             } catch (IOException e) {
-                throw new LivyException("Unable to deserialize SaveResponse returned from Livy"); // TODO: specialize me
+                throw new LivySerializationException(errMsg);
             } // end try/catch
         } else {
-            throw new LivyException("Unable to deserialize SaveResponse returned from Livy"); // TODO: specialize me
+            throw new LivySerializationException(errMsg);
+        }
+    }
+
+    private static void checkCodeWasWellFormed(StatementOutputResponse statementOutputResponse) {
+        if (statementOutputResponse != null && statementOutputResponse.getStatus() != StatementOutputStatus.ok) {
+            String msg = String.format("Malformed code sent to Livy.  ErrorType='%s', Error='%s', Traceback='%s'",
+                    statementOutputResponse.getEname(),
+                    statementOutputResponse.getEvalue(),
+                    statementOutputResponse.getTraceback());
+            throw new LivyCodeException(msg);
         }
     }
 }

@@ -219,7 +219,7 @@ public class SparkLivyProcessManager implements SparkShellProcessManager {
         Optional<Session> optSession;
         do {
             try {
-                Thread.sleep(100);
+                Thread.sleep(250);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

@@ -22,25 +22,13 @@ package com.thinkbiganalytics.spark.rest.controller;
 
 import com.thinkbiganalytics.feedmgr.security.FeedServicesAccessControl;
 import com.thinkbiganalytics.feedmgr.service.datasource.DatasourceModelTransform;
-import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.metadata.api.MetadataAccess;
 import com.thinkbiganalytics.metadata.api.datasource.DatasourceProvider;
 import com.thinkbiganalytics.rest.model.RestResponseStatus;
 import com.thinkbiganalytics.security.AccessController;
-import com.thinkbiganalytics.spark.rest.model.DataSources;
-import com.thinkbiganalytics.spark.rest.model.Datasource;
-import com.thinkbiganalytics.spark.rest.model.JdbcDatasource;
-import com.thinkbiganalytics.spark.rest.model.RegistrationRequest;
-import com.thinkbiganalytics.spark.rest.model.SaveRequest;
-import com.thinkbiganalytics.spark.rest.model.SaveResponse;
-import com.thinkbiganalytics.spark.rest.model.TransformRequest;
-import com.thinkbiganalytics.spark.rest.model.TransformResponse;
-import com.thinkbiganalytics.spark.shell.SparkShellProcess;
-import com.thinkbiganalytics.spark.shell.SparkShellProcessManager;
-import com.thinkbiganalytics.spark.shell.SparkShellRestClient;
-import com.thinkbiganalytics.spark.shell.SparkShellSaveException;
-import com.thinkbiganalytics.spark.shell.SparkShellTransformException;
-
+import com.thinkbiganalytics.spark.rest.model.*;
+import com.thinkbiganalytics.spark.shell.*;
+import io.swagger.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -48,37 +36,17 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.MissingResourceException;
-import java.util.Optional;
-import java.util.ResourceBundle;
-import java.util.function.Supplier;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.ws.rs.BadRequestException;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.*;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
-import io.swagger.annotations.SwaggerDefinition;
-import io.swagger.annotations.Tag;
+import java.util.*;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Provides an endpoint for proxying to the actual Spark Shell service.
