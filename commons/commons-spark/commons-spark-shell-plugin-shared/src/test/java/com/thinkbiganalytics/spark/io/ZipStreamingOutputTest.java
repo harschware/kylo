@@ -22,16 +22,9 @@ package com.thinkbiganalytics.spark.io;
 
 import com.google.common.collect.ForwardingIterator;
 import com.google.common.collect.Iterators;
-
 import org.apache.commons.io.input.NullInputStream;
 import org.apache.commons.io.output.ByteArrayOutputStream;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PositionedReadable;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.junit.Assert;
 import org.junit.Test;
@@ -39,14 +32,13 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import javax.annotation.Nonnull;
 
 public class ZipStreamingOutputTest {
 

@@ -2,16 +2,16 @@ package com.thinkbiganalytics.spark.io;
 
 /*-
  * #%L
- * kylo-spark-shell-client-app
+ * kylo-commons-spark-shell-plugin-shared
  * %%
- * Copyright (C) 2017 ThinkBig Analytics
+ * Copyright (C) 2017 - 2018 ThinkBig Analytics, a Teradata Company
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,27 +20,24 @@ package com.thinkbiganalytics.spark.io;
  * #L%
  */
 
+
 import com.google.common.io.ByteStreams;
+import com.thinkbiganalytics.spark.exceptions.SparkShellPluginIoException;
+import org.apache.hadoop.fs.*;
 
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
-
+import javax.annotation.Nonnull;
+import javax.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import javax.annotation.Nonnull;
-import javax.ws.rs.core.StreamingOutput;
 
 /**
  * Packages the files in a folder as a ZIP file and writes to an output stream.
  *
  * <p>The folder will be automatically deleted after it is outputted.</p>
  */
+// TODO: This class is a copy from spark-shell-client-app
 public class ZipStreamingOutput implements StreamingOutput {
 
     /**
@@ -67,6 +64,8 @@ public class ZipStreamingOutput implements StreamingOutput {
     public void write(@Nonnull final OutputStream output) throws IOException {
         try {
             writeZip(output);
+        } catch (Exception e) {
+            throw new SparkShellPluginIoException("Unrecognized exception encountered when attempting to write results to zip stream", e);
         } finally {
             HadoopUtil.deleteLater(folder, fileSystem);
         }

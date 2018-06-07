@@ -53,6 +53,11 @@
             <artifactId>kylo-spark-job-profiler-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.thinkbiganalytics.kylo</groupId>
+            <artifactId>kylo-commons-spark-shell-plugin-shared</artifactId>
+            <version>${kylo.version}</version>
+        </dependency>
 
         <!-- Spring -->
         <dependency>
@@ -67,6 +72,7 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
         </dependency>
+
 
         <!-- Testing -->
         <dependency>

@@ -1,8 +1,8 @@
-package com.thinkbiganalytics.kylo.exceptions;
+package com.thinkbiganalytics.spark.model;
 
 /*-
  * #%L
- * kylo-spark-livy-core
+ * kylo-commons-spark-shell-plugin-shared
  * %%
  * Copyright (C) 2017 - 2018 ThinkBig Analytics, a Teradata Company
  * %%
@@ -20,20 +20,29 @@ package com.thinkbiganalytics.kylo.exceptions;
  * #L%
  */
 
-public class LivySerializationException extends LivyException {
-    public LivySerializationException() {
-        super();
+import org.apache.hadoop.fs.Path;
+
+/**
+ * Result of saving a transformation.
+ */
+public class SaveResult {
+
+    /**
+     * Destination path
+     */
+    private Path path;
+
+    public SaveResult() {}
+
+    public SaveResult(Path path) {
+        this.path = path;
     }
 
-    public LivySerializationException(String s) {
-        super(s);
+    public Path getPath() {
+        return path;
     }
 
-    public LivySerializationException(String s, Throwable throwable) {
-        super(s, throwable);
-    }
-
-    public LivySerializationException(Throwable cause) {
-        super(cause);
+    public void setPath(Path path) {
+        this.path = path;
     }
 }

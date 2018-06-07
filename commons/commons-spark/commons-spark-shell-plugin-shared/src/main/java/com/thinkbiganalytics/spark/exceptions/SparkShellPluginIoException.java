@@ -1,17 +1,17 @@
-package com.thinkbiganalytics.spark.model;
+package com.thinkbiganalytics.spark.exceptions;
 
 /*-
  * #%L
- * kylo-spark-shell-client-app
+ * kylo-commons-spark-shell-plugin-shared
  * %%
- * Copyright (C) 2017 ThinkBig Analytics
+ * Copyright (C) 2017 - 2018 ThinkBig Analytics, a Teradata Company
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,23 +20,20 @@ package com.thinkbiganalytics.spark.model;
  * #L%
  */
 
-import org.apache.hadoop.fs.Path;
-
-/**
- * Result of saving a transformation.
- */
-public class SaveResult {
-
-    /**
-     * Destination path
-     */
-    private Path path;
-
-    public Path getPath() {
-        return path;
+public class SparkShellPluginIoException extends SparkShellPluginException {
+    public SparkShellPluginIoException() {
+        super();
     }
 
-    public void setPath(Path path) {
-        this.path = path;
+    public SparkShellPluginIoException(String s) {
+        super(s);
+    }
+
+    public SparkShellPluginIoException(String s, Throwable throwable) {
+        super(s, throwable);
+    }
+
+    public SparkShellPluginIoException(Throwable cause) {
+        super(cause);
     }
 }

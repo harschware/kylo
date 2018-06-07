@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
 
@@ -258,5 +259,12 @@ public class LivyRestModelTransformer {
                     statementOutputResponse.getTraceback());
             throw new LivyCodeException(msg);
         }
+    }
+
+    public static URI toUri(Statement statement) {
+        StatementOutputResponse sor = statement.getOutput();
+        checkCodeWasWellFormed(sor);
+
+        return serializeStatementOutputResponse(sor, URI.class);
     }
 }

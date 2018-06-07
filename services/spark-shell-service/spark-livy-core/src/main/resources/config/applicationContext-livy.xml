@@ -119,6 +119,16 @@ val respAsStr = mapper.writeValueAsString(dataSources)
                         ]]>
                     </value>
                 </entry>
+
+                <entry key="getSaveResult">
+                    <value>
+                        <![CDATA[
+val saveResult = sparkShellTransformController.getSaveResult(%s)
+val respAsStr = mapper.writeValueAsString(saveResult.getPath().toUri())
+%%json respAsStr
+                        ]]>
+                    </value>
+                </entry>
             </map>
         </constructor-arg>
     </bean>

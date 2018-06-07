@@ -40,6 +40,7 @@ import javax.ws.rs.*;
 import javax.ws.rs.core.*;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.concurrent.ExecutionException;
 
 public abstract class AbstractTransformController {
     private static final Logger logger = LoggerFactory.getLogger(AbstractTransformController.class);
@@ -77,24 +78,11 @@ public abstract class AbstractTransformController {
     })
     @Nonnull
     public Response download(@Nonnull @PathParam("save") final String id) {
-        // Find job
-        SaveJob job;
+        SaveResult result;
         try {
-            job = transformService.getSaveJob(id, true);
-        } catch (final IllegalArgumentException e) {
-            job = null;
-        }
-
-        // Get result
-        final SaveResult result;
-        if (job != null && job.isDone()) {
-            try {
-                result = job.get();
-            } catch (final Exception e) {
-                return error(Response.Status.INTERNAL_SERVER_ERROR, e);
-            }
-        } else {
-            result = null;
+            result = getSaveResult(id);
+        } catch (final Exception e) {
+            return error(Response.Status.INTERNAL_SERVER_ERROR, e);
         }
 
         // Return response
@@ -107,6 +95,27 @@ public abstract class AbstractTransformController {
             return error(Response.Status.NOT_FOUND, "download.notFound");
         }
     }
+
+    public SaveResult getSaveResult(String id) throws ExecutionException, InterruptedException {
+        // Find job
+        SaveJob job;
+        try {
+            job = transformService.getSaveJob(id, true);
+        } catch (final IllegalArgumentException e) {
+            job = null;
+        }
+
+        // Get result
+        final SaveResult result;
+        if (job != null && job.isDone()) {
+                result = job.get();
+        } else {
+            result = null;
+        }
+
+        return result;
+    }
+
 
     /**
      * Requests the status of a save.

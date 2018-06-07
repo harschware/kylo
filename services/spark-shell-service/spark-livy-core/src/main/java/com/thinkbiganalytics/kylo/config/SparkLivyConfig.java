@@ -26,11 +26,11 @@ import com.thinkbiganalytics.kylo.spark.livy.SparkLivyRestClient;
 import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
 import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.spark.shell.SparkShellRestClient;
+import org.apache.hadoop.fs.FileSystem;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.ImportResource;
-import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.annotation.*;
+
+import java.io.IOException;
 
 @Configuration
 @PropertySource("classpath:spark.properties")
@@ -76,5 +76,12 @@ public class SparkLivyConfig {
         return new ScalaScriptService();
     }
 
+    /**
+     * Gets the Hadoop File System.
+     */
+    @Bean
+    public FileSystem fileSystem() throws IOException {
+        return FileSystem.get(new org.apache.hadoop.conf.Configuration());
+    }
 
 }
