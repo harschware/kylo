@@ -28,8 +28,8 @@ import com.google.common.collect.Lists;
 import com.thinkbiganalytics.discovery.model.DefaultQueryResultColumn;
 import com.thinkbiganalytics.discovery.schema.QueryResultColumn;
 import com.thinkbiganalytics.kylo.exceptions.LivyCodeException;
+import com.thinkbiganalytics.kylo.exceptions.LivyDeserializationException;
 import com.thinkbiganalytics.kylo.exceptions.LivyException;
-import com.thinkbiganalytics.kylo.exceptions.LivySerializationException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementOutputResponse;
 import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
@@ -61,7 +61,7 @@ public class LivyRestModelTransformer {
 
         if (response.getStatus() == TransformResponse.Status.SUCCESS) {
             String code = statement.getCode();
-            if (code.endsWith("dfRows\n")) {
+            if (code.endsWith("dfRowsAsJson\n")) {
                 response.setResults(toTransformQueryResultWithSchema(statement.getOutput()));
             } else if (code.endsWith("dfProf")) {
                 List<OutputRow> rows = toTransformResponseProfileStats(statement.getOutput());
@@ -82,92 +82,104 @@ public class LivyRestModelTransformer {
     }
 
 
-
     private static TransformQueryResult toTransformQueryResultWithSchema(StatementOutputResponse sor) {
         checkCodeWasWellFormed(sor);
 
         TransformQueryResult tqr = new TransformQueryResult();
 
-        JsonNode data = sor.getData();
         List<QueryResultColumn> resColumns = Lists.newArrayList();
         tqr.setColumns(resColumns);
 
-        ArrayNode json = (ArrayNode) data.get("application/json");
-        int numRows = 0;
+        JsonNode data = sor.getData();
+        if (data != null) {
+            JsonNode appJson = data.get("application/json");
+            String payload = appJson.asText();
 
-        Iterator<JsonNode> rowIter = json.elements();
-        List<List<Object>> rowData = Lists.newArrayList();
-        while (rowIter.hasNext()) {
-            JsonNode row = rowIter.next();
-            if (numRows++ == 0) {
-                String jsonString = row.asText();
-                try {
-                    JsonNode actualObj = mapper.readTree(jsonString);
-                    row = actualObj;
-                } catch (IOException e) {
-                    throw new LivyException("Unable to read schema JSON structure returned from Livy"); // TODO: specialize me
-                } // end try/catch
+            ArrayNode json;
+            try {
+                json = (ArrayNode) mapper.readTree(payload);
+            } catch (IOException e) {
+                throw new LivyDeserializationException("Unable to read dataFrame returned from Livy");
+            } // end try/catch
 
-                //  build column metadata
-                logger.debug("build column metadata");
-                String type = row.get("type").asText();
-                if (type.equals("struct")) {
-                    ArrayNode fields = (ArrayNode) row.get("fields");
+            int numRows = 0;
 
-                    Iterator<JsonNode> colObjsIter = fields.elements();
+            Iterator<JsonNode> rowIter = json.elements();
+            List<List<Object>> rowData = Lists.newArrayList();
+            while (rowIter.hasNext()) {
+                JsonNode row = rowIter.next();
+                if (numRows++ == 0) {
+                    String schemaPayload = row.asText();
 
-                    int idx = 0;
-                    while (colObjsIter.hasNext()) {
-                        ObjectNode colObj = (ObjectNode) colObjsIter.next();
-                        final JsonNode dataType = colObj.get("type");
-                        JsonNode metadata = colObj.get("metadata");
-                        String name = colObj.get("name").asText();
-                        String nullable = colObj.get("nullable").asText();  // "true"|"false"
+                    ObjectNode schemaObj;
+                    try {
+                        schemaObj = (ObjectNode) mapper.readTree(schemaPayload);
+                    } catch (IOException e) {
+                        throw new LivyDeserializationException("Unable to read dataFrame returned from Livy");
+                    } // end try/catch
+
+                    //  build column metadata
+                    logger.debug("build column metadata");
+                    String type = schemaObj.get("type").asText();
+                    if (type.equals("struct")) {
+                        ArrayNode fields = (ArrayNode) schemaObj.get("fields");
+
+                        Iterator<JsonNode> colObjsIter = fields.elements();
+
+                        int idx = 0;
+                        while (colObjsIter.hasNext()) {
+                            ObjectNode colObj = (ObjectNode) colObjsIter.next();
+                            final JsonNode dataType = colObj.get("type");
+                            JsonNode metadata = colObj.get("metadata");
+                            String name = colObj.get("name").asText();
+                            String nullable = colObj.get("nullable").asText();  // "true"|"false"
 
 
-                        QueryResultColumn qrc = new DefaultQueryResultColumn();
-                        qrc.setDisplayName(name);
-                        qrc.setField(name);
-                        qrc.setHiveColumnLabel(name);  // not used, but still be expected to be unique
-                        qrc.setIndex(idx++);
-                        qrc.setDataType(dataType.asText()); // dataType is always empty:: https://www.mail-archive.com/user@livy.incubator.apache.org/msg00262.html
-                        qrc.setComment(metadata.asText());
-                        resColumns.add(qrc);
-                    }
-                } // will there be types other than "struct"?
-                continue;
-            } // end schema extraction
+                            QueryResultColumn qrc = new DefaultQueryResultColumn();
+                            qrc.setDisplayName(name);
+                            qrc.setField(name);
+                            qrc.setHiveColumnLabel(name);  // not used, but still be expected to be unique
+                            qrc.setIndex(idx++);
+                            // dataType is always empty if %json of dataframe directly:: https://www.mail-archive.com/user@livy.incubator.apache.org/msg00262.html
+                            qrc.setDataType(dataType.asText());
+                            qrc.setComment(metadata.asText());
+                            resColumns.add(qrc);
+                        }
+                    } // will there be types other than "struct"?
+                    continue;
+                } // end schema extraction
 
-            // get row data
-            logger.debug("build row data");
-            ArrayNode valueRows = (ArrayNode) row;
+                // get row data
+                logger.debug("build row data");
+                ArrayNode valueRows = (ArrayNode) row;
 
-            Iterator<JsonNode> valuesIter = valueRows.elements();
-            while (valuesIter.hasNext()) {
-                ArrayNode valueNode = (ArrayNode) valuesIter.next();
-                Iterator<JsonNode> valueNodes = valueNode.elements();
-                List<Object> newValues = Lists.newArrayListWithCapacity(resColumns.size());
-                int colCount = 0;
-                while (valueNodes.hasNext()) {
-                    JsonNode value = valueNodes.next();
-                    QueryResultColumn qrc = resColumns.get(colCount++);
-                    // extract values according to the schema that was communicated by spark
-                    switch (qrc.getDataType()) {
-                        case "integer":
-                            newValues.add(value.asInt());
-                            break;
-                        default:
-                            newValues.add(value.asText());
-                            break;
-                    }
-                } // end while
-                rowData.add(newValues);
-            } // end of valueRows
-        } // end sor.data
-        logger.trace("rowData={}", rowData);
-        tqr.setRows(rowData);
-        //tqr.setValidationResults(null);
-
+                Iterator<JsonNode> valuesIter = valueRows.elements();
+                while (valuesIter.hasNext()) {
+                    ArrayNode valueNode = (ArrayNode) valuesIter.next();
+                    Iterator<JsonNode> valueNodes = valueNode.elements();
+                    List<Object> newValues = Lists.newArrayListWithCapacity(resColumns.size());
+                    int colCount = 0;
+                    while (valueNodes.hasNext()) {
+                        JsonNode value = valueNodes.next();
+                        QueryResultColumn qrc = resColumns.get(colCount++);
+                        // extract values according to the schema that was communicated by spark
+                        switch (qrc.getDataType()) {
+                            // TODO: expand?!?
+                            case "integer":
+                                newValues.add(value.asInt());
+                                break;
+                            default:
+                                newValues.add(value.asText());
+                                break;
+                        } // end switch
+                    } // end while
+                    rowData.add(newValues);
+                } // end of valueRows
+            } // end sor.data
+            logger.trace("rowData={}", rowData);
+            tqr.setRows(rowData);
+            //tqr.setValidationResults(null);
+        } // end if data!=null
         return tqr;
     }
 
@@ -253,10 +265,10 @@ public class LivyRestModelTransformer {
                 T clazzInstance = mapper.readValue(jsonString, clazz);
                 return clazzInstance;
             } catch (IOException e) {
-                throw new LivySerializationException(errMsg);
+                throw new LivyDeserializationException(errMsg);
             } // end try/catch
         } else {
-            throw new LivySerializationException(errMsg);
+            throw new LivyDeserializationException(errMsg);
         }
     }
 

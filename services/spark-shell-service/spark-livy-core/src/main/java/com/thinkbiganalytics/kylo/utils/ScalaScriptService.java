@@ -88,7 +88,9 @@ public class ScalaScriptService {
                 ".registerTempTable( \"" + transformId + "\" )\n");
 
         sb.append(wrapScriptWithPaging(script, request.getPageSpec()));
-        sb.append("%json dfRows\n");
+
+        sb.append("val dfRowsAsJson = mapper.writeValueAsString(dfRows)\n");
+        sb.append("%json dfRowsAsJson\n");
 
         return sb.toString();
     }

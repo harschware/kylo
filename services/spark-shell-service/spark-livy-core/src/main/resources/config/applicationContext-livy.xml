@@ -41,9 +41,10 @@ val converterService =
 ctx.getBean(classOf[com.thinkbiganalytics.spark.service.DataSetConverterService])
 val sparkShellTransformController =
 ctx.getBean(classOf[com.thinkbiganalytics.spark.rest.SparkShellTransformController])
-val mapper = new com.fasterxml.jackson.databind.ObjectMapper()
 val sparkUtilityService =
 ctx.getBean(classOf[com.thinkbiganalytics.spark.service.SparkUtilityService])
+val mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+mapper.registerModule(com.fasterxml.jackson.module.scala.DefaultScalaModule)
                         ]]>
                     </value>
                 </entry>

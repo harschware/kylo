@@ -20,20 +20,20 @@ package com.thinkbiganalytics.kylo.exceptions;
  * #L%
  */
 
-public class LivySerializationException extends LivyException {
-    public LivySerializationException() {
+public class LivyDeserializationException extends LivyException {
+    public LivyDeserializationException() {
         super();
     }
 
-    public LivySerializationException(String s) {
+    public LivyDeserializationException(String s) {
         super(s);
     }
 
-    public LivySerializationException(String s, Throwable throwable) {
+    public LivyDeserializationException(String s, Throwable throwable) {
         super(s, throwable);
     }
 
-    public LivySerializationException(Throwable cause) {
+    public LivyDeserializationException(Throwable cause) {
         super(cause);
     }
 }
