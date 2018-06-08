@@ -21,19 +21,15 @@ package com.thinkbiganalytics.spark.service;
  */
 
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
-import org.apache.commons.io.FileUtils;
 import org.apache.spark.sql.sources.DataSourceRegister;
 import org.slf4j.ext.XLogger;
 import org.slf4j.ext.XLoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.annotation.Resource;
-import java.io.File;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 

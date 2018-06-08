@@ -37,8 +37,8 @@ import com.thinkbiganalytics.spark.metadata.TransformScript;
 import com.thinkbiganalytics.spark.repl.SparkScriptEngine;
 import com.thinkbiganalytics.spark.service.*;
 import com.thinkbiganalytics.spark.shell.DatasourceProviderFactory;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
@@ -46,25 +46,23 @@ import org.apache.spark.sql.SQLContext;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.embedded.EmbeddedServletContainerFactory;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.*;
 import org.springframework.context.annotation.ComponentScan.Filter;
-import org.springframework.context.annotation.FilterType;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.core.env.AbstractEnvironment;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.support.ResourcePropertySource;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
-
+@Configuration
 @ComponentScan(
         basePackages = {"com.thinkbiganalytics.spark"},
         excludeFilters = {@Filter(
@@ -81,10 +79,7 @@ import java.util.concurrent.TimeUnit;
                 value = {ResourceConfig.class}
         )}
 )
-/*
 @PropertySource(value = {"classpath:sparkDefaults.properties", "classpath:spark.properties", "classpath:sparkDevOverride.properties"}, ignoreResourceNotFound = true)
-@SpringBootApplication(exclude = {SecurityCoreConfig.class, VelocityAutoConfiguration.class, WebSocketAutoConfiguration.class})  // ignore auto-configuration classes outside Spark Shell
-*/
 public class LivyWranglerConfig {
     private static SparkContext sparkContext;
     private static SQLContext sqlContext;
@@ -99,6 +94,14 @@ public class LivyWranglerConfig {
 
     public static void setSqlContext(SQLContext sqlContext) {
         LivyWranglerConfig.sqlContext = sqlContext;
+    }
+
+    /**
+     * Property placeholder configurer needed to process @Value annotations
+     */
+    @Bean
+    public static PropertySourcesPlaceholderConfigurer propertyConfigurer() {
+        return new PropertySourcesPlaceholderConfigurer();
     }
 
     @Bean
@@ -126,12 +129,13 @@ public class LivyWranglerConfig {
     @Bean
     @Primary
     public FileSystem fileSystem() throws IOException {
-        return FileSystem.get(new Configuration());
+        return FileSystem.get(new org.apache.hadoop.conf.Configuration());
     }
 
     /**
      * Creates a service to stop this app after a period of inactivity.
      */
+    /*
     @Bean
     @Primary
     public IdleMonitorService idleMonitorService(final SparkShellOptions parameters) {
@@ -139,6 +143,7 @@ public class LivyWranglerConfig {
         idleMonitorService.startAsync();
         return idleMonitorService;
     }
+    */
 
     /**
      * Gets the resource configuration for setting up Jersey.
@@ -251,7 +256,6 @@ public class LivyWranglerConfig {
      *
      * @return the Spark configuration
      */
-
     @Bean
     @Primary
     public SparkConf sparkConf(final Environment env/*, @Qualifier("sparkShellPort") final int serverPort*/) {
@@ -368,7 +372,10 @@ public class LivyWranglerConfig {
     }
 
     @Bean(name = "downloadsDatasourceExcludes")
-    public List<String> getDownloadsDatasourceExcludes(@Value("${spark.shell.datasources.exclude.downloads}") String excludesStr) {
+    public List<String> getDownloadsDatasourceExcludes(@Value("${spark.shell.datasources.exclude.downloads}") String excludesStr) throws IOException {
+
+        FileUtils.write(new File("/tmp/exDownloads.txt"), excludesStr);
+
         List<String> excludes = Lists.newArrayList();
         if (StringUtils.isNotEmpty(excludesStr)) {
             excludes.addAll(Arrays.asList(excludesStr.split(",")));
@@ -377,7 +384,9 @@ public class LivyWranglerConfig {
     }
 
     @Bean(name = "tablesDatasourceExcludes")
-    public List<String> getTablesDatasourceExcludes(@Value("${spark.shell.datasources.exclude.tables}") String excludesStr) {
+    public List<String> getTablesDatasourceExcludes(@Value("${spark.shell.datasources.exclude.tables}") String excludesStr) throws IOException {
+        FileUtils.write(new File("/tmp/exTables.txt"), excludesStr);
+
         List<String> excludes = Lists.newArrayList();
         if (StringUtils.isNotEmpty(excludesStr)) {
             excludes.addAll(Arrays.asList(excludesStr.split(",")));

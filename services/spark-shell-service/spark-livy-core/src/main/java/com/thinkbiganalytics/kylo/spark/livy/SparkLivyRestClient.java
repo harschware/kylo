@@ -75,25 +75,48 @@ public class SparkLivyRestClient implements SparkShellRestClient {
 
     @Nonnull
     @Override
+    public Optional<TransformResponse> getQueryResult(@Nonnull SparkShellProcess process, @Nonnull String id) {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Nonnull
+    @Override
+    public Optional<SaveResponse> getQuerySave(@Nonnull SparkShellProcess process, @Nonnull String
+            queryId, @Nonnull String saveId) {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Nonnull
+    @Override
+    public TransformResponse query(@Nonnull SparkShellProcess process, @Nonnull TransformRequest request) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Nonnull
+    @Override
+    public SaveResponse saveQuery(@Nonnull SparkShellProcess process, @Nonnull String id, @Nonnull SaveRequest
+            request) {
+        throw new UnsupportedOperationException();
+    }
+
+
+    @Nonnull
+    @Override
     public Optional<Response> downloadTransform(@Nonnull SparkShellProcess process, @Nonnull String transformId, @Nonnull String saveId) {
         // 1. get "SaveResult" serialized from Livy
-        logger.info("getDataSources(process) called");
+        logger.info("downloadTransform(process,transformId,saveId) called");
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
         String script = scriptGenerator.script("getSaveResult", scalaStr(saveId));
 
-        StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
-
-        Integer sessionId = sparkLivyProcessManager.getLivySessionId(process);
-        Statement statement = client.post(String.format("/sessions/%s/statements", sessionId),
-                sp,
-                Statement.class);
-        logger.info("{}", statement);
+        Statement statement = submitCode(client, script, process);
 
         if (statement.getState() == StatementState.running
                 || statement.getState() == StatementState.waiting) {
-            statement = getStatement(client, sessionId, statement.getId());
+            statement = getStatement(client, sparkLivyProcessManager.getLivySessionId(process), statement.getId());
             logger.info("{}", statement);
         } else {
             throw new LivyException("Unexpected error");
@@ -119,20 +142,6 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     }
 
 
-    /**
-     * Creates a response for the specified message.
-     *
-     * @param status  the response status
-     * @param message the message text
-     * @return the response
-     */
-    private Response createErrorResponse(@Nonnull final Response.Status status, @Nonnull final String message) {
-        final TransformResponse entity = new TransformResponse();
-        entity.setMessage(message);
-        entity.setStatus(TransformResponse.Status.ERROR);
-        return Response.status(status).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).entity(entity).build();
-    }
-
     @Nonnull
     @Override
     public DataSources getDataSources(@Nonnull SparkShellProcess process) {
@@ -142,17 +151,11 @@ public class SparkLivyRestClient implements SparkShellRestClient {
 
         String script = scriptGenerator.script("getDataSources");
 
-        StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
-
-        Integer sessionId = sparkLivyProcessManager.getLivySessionId(process);
-        Statement statement = client.post(String.format("/sessions/%s/statements", sessionId),
-                sp,
-                Statement.class);
-        logger.info("{}", statement);
+        Statement statement = submitCode(client, script, process);
 
         if (statement.getState() == StatementState.running
                 || statement.getState() == StatementState.waiting) {
-            statement = getStatement(client, sessionId, statement.getId());
+            statement = getStatement(client, sparkLivyProcessManager.getLivySessionId(process), statement.getId());
             logger.info("{}", statement);
         } else {
             throw new LivyException("Unexpected error");
@@ -161,30 +164,6 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         return LivyRestModelTransformer.toDataSources(statement);
     }
 
-
-    // TODO: is there a better way to wait for response than synchronous?  UI could poll?
-    private Statement getStatement(JerseyRestClient jerseyClient, Integer sessionId, Integer stmtId) {
-        Statement statement = null;
-        do {
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            statement = jerseyClient.get(String.format("/sessions/%s/statements/%s", sessionId, stmtId),
-                    Statement.class);
-            logger.debug("getStatement statement={}", statement);
-        } while (statement == null || !statement.getState().equals(StatementState.available));
-
-        return statement;
-    }
-
-    @Nonnull
-    @Override
-    public Optional<TransformResponse> getQueryResult(@Nonnull SparkShellProcess process, @Nonnull String id) {
-        throw new UnsupportedOperationException();
-    }
 
     @Nonnull
     @Override
@@ -203,13 +182,6 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         logger.info("getStatement id={}, spr={}", stmtId, statement);
         TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement, transformId);
         return Optional.of(response);
-    }
-
-    @Nonnull
-    @Override
-    public Optional<SaveResponse> getQuerySave(@Nonnull SparkShellProcess process, @Nonnull String
-            queryId, @Nonnull String saveId) {
-        throw new UnsupportedOperationException();
     }
 
     @Nonnull
@@ -234,31 +206,11 @@ public class SparkLivyRestClient implements SparkShellRestClient {
             // saveId is not an integer.  We have already processed Livy Response
             String script = scriptGenerator.script("getSave", saveId);
 
-            StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
-            statement = client.post(String.format("/sessions/%s/statements", sparkLivyProcessManager.getLivySessionId(process)),
-                    sp,
-                    Statement.class);
+            statement = submitCode(client, script, process);
             response = LivyRestModelTransformer.toSaveResponse(statement);
-
-            logger.info("{}", statement);
         }
 
-
-        // TODO:
         return Optional.of(response);
-    }
-
-    @Nonnull
-    @Override
-    public TransformResponse query(@Nonnull SparkShellProcess process, @Nonnull TransformRequest request) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Nonnull
-    @Override
-    public SaveResponse saveQuery(@Nonnull SparkShellProcess process, @Nonnull String id, @Nonnull SaveRequest
-            request) {
-        throw new UnsupportedOperationException();
     }
 
 
@@ -266,7 +218,7 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     @Override
     public SaveResponse saveTransform(@Nonnull SparkShellProcess process, @Nonnull String
             transformId, @Nonnull SaveRequest request) {
-        logger.info("saveTransform(process,id,saveRequest) called");
+        logger.debug("saveTransform(process,transformId,saveRequest) called");
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
@@ -277,13 +229,7 @@ public class SparkLivyRestClient implements SparkShellRestClient {
                 mode, tableName);
         String script = scriptGenerator.wrappedScript("submitSaveJob", makeRequest, "\n", transformId);
 
-        StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
-
-        Statement statement = client.post(String.format("/sessions/%s/statements", sparkLivyProcessManager.getLivySessionId(process)),
-                sp,
-                Statement.class);
-
-        logger.info("{}", statement);
+        Statement statement = submitCode(client, script, process);
 
         SaveResponse saveResponse = new SaveResponse();
         saveResponse.setId(statement.getId().toString());
@@ -293,14 +239,17 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         return saveResponse;
     }
 
+    private Statement submitCode(JerseyRestClient client, String script, SparkShellProcess process) {
+        StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
 
-    private static String scalaStr(Object o) {
-        if (o == null) {
-            return "null";
-        } else {
-            return '"' + String.valueOf(o) + '"';
-        }
+        Statement statement = client.post(String.format("/sessions/%s/statements", sparkLivyProcessManager.getLivySessionId(process)),
+                sp,
+                Statement.class);
+        logger.debug("statement={}", statement);
+
+        return statement;
     }
+
 
     @Nonnull
     @Override
@@ -312,13 +261,8 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         // a tablename will be calculated for the request
         String script = scalaScriptService.wrapScriptForLivy(request);
 
-        StatementsPost sp = new StatementsPost.Builder().code(script).kind("spark").build();
+        Statement statement = submitCode(client, script, process);
 
-        Statement statement = client.post(String.format("/sessions/%s/statements", sparkLivyProcessManager.getLivySessionId(process)),
-                sp,
-                Statement.class);
-
-        logger.info("statement={}", statement);
         sparkLivyProcessManager.setLastStatementId(process, statement.getId());
 
         TransformResponse response = new TransformResponse();
@@ -328,6 +272,51 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         response.setTable(scalaScriptService.transformCache.getIfPresent(request));
 
         return response;
+    }
+
+    // TODO: is there a better way to wait for a response than synchronous?  UI could poll?
+    private Statement getStatement(JerseyRestClient jerseyClient, Integer sessionId, Integer stmtId) {
+        Statement statement = null;
+        do {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            statement = jerseyClient.get(String.format("/sessions/%s/statements/%s", sessionId, stmtId),
+                    Statement.class);
+            logger.debug("getStatement statement={}", statement);
+        } while (statement == null || !statement.getState().equals(StatementState.available));
+
+        return statement;
+    }
+
+    /**
+     * Creates a scala string literal of the given object
+     * @param obj
+     * @return a literal that can be placed in a scala code snippet
+     */
+    private static String scalaStr(Object obj) {
+        if (obj == null) {
+            return "null";
+        } else {
+            return '"' + String.valueOf(obj) + '"';
+        }
+    }
+
+    /**
+     * Creates a response for the specified message.
+     *
+     * @param status  the response status
+     * @param message the message text
+     * @return the response
+     */
+    private static Response createErrorResponse(@Nonnull final Response.Status status, @Nonnull final String message) {
+        final TransformResponse entity = new TransformResponse();
+        entity.setMessage(message);
+        entity.setStatus(TransformResponse.Status.ERROR);
+        return Response.status(status).header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON).entity(entity).build();
     }
 
 }

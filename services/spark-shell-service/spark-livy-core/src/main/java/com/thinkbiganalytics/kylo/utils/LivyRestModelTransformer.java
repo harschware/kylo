@@ -82,24 +82,6 @@ public class LivyRestModelTransformer {
     }
 
 
-    private static TransformResponse prepTransformResponse(Statement statement, String transformId) {
-        TransformResponse response = new TransformResponse();
-
-        TransformResponse.Status status = StatementStateTranslator.translate(statement.getState());
-        response.setStatus(status);
-        response.setProgress(statement.getProgress());
-        response.setTable(transformId);
-        return response;
-    }
-
-
-    private static TransformQueryResult emptyResult() {
-        TransformQueryResult tqr = new TransformQueryResult();
-        tqr.setColumns(Lists.newArrayList());
-        tqr.setRows(Lists.newArrayList());
-        return tqr;
-    }
-
 
     private static TransformQueryResult toTransformQueryResultWithSchema(StatementOutputResponse sor) {
         checkCodeWasWellFormed(sor);
@@ -226,11 +208,38 @@ public class LivyRestModelTransformer {
         return serializeStatementOutputResponse(sor, SaveResponse.class);
     }
 
+
+    private static TransformResponse prepTransformResponse(Statement statement, String transformId) {
+        TransformResponse response = new TransformResponse();
+
+        TransformResponse.Status status = StatementStateTranslator.translate(statement.getState());
+        response.setStatus(status);
+        response.setProgress(statement.getProgress());
+        response.setTable(transformId);
+        return response;
+    }
+
+
+    private static TransformQueryResult emptyResult() {
+        TransformQueryResult tqr = new TransformQueryResult();
+        tqr.setColumns(Lists.newArrayList());
+        tqr.setRows(Lists.newArrayList());
+        return tqr;
+    }
+
     public static DataSources toDataSources(Statement statement) {
         StatementOutputResponse sor = statement.getOutput();
         checkCodeWasWellFormed(sor);
 
         return serializeStatementOutputResponse(sor, DataSources.class);
+    }
+
+
+    public static URI toUri(Statement statement) {
+        StatementOutputResponse sor = statement.getOutput();
+        checkCodeWasWellFormed(sor);
+
+        return serializeStatementOutputResponse(sor, URI.class);
     }
 
     private static <T extends Object> T serializeStatementOutputResponse(StatementOutputResponse sor, Class<T> clazz) {
@@ -261,10 +270,4 @@ public class LivyRestModelTransformer {
         }
     }
 
-    public static URI toUri(Statement statement) {
-        StatementOutputResponse sor = statement.getOutput();
-        checkCodeWasWellFormed(sor);
-
-        return serializeStatementOutputResponse(sor, URI.class);
-    }
 }
