@@ -86,9 +86,7 @@ public class LivyRestModelTransformer {
         checkCodeWasWellFormed(sor);
 
         TransformQueryResult tqr = new TransformQueryResult();
-
-        List<QueryResultColumn> resColumns = Lists.newArrayList();
-        tqr.setColumns(resColumns);
+        tqr.setColumns(Lists.newArrayList());
 
         JsonNode data = sor.getData();
         if (data != null) {
@@ -115,7 +113,7 @@ public class LivyRestModelTransformer {
                     try {
                         schemaObj = (ObjectNode) mapper.readTree(schemaPayload);
                     } catch (IOException e) {
-                        throw new LivyDeserializationException("Unable to read dataFrame returned from Livy");
+                        throw new LivyDeserializationException("Unable to read deserialize dataFrame schema returned from Livy");
                     } // end try/catch
 
                     //  build column metadata
@@ -134,7 +132,6 @@ public class LivyRestModelTransformer {
                             String name = colObj.get("name").asText();
                             String nullable = colObj.get("nullable").asText();  // "true"|"false"
 
-
                             QueryResultColumn qrc = new DefaultQueryResultColumn();
                             qrc.setDisplayName(name);
                             qrc.setField(name);
@@ -143,7 +140,7 @@ public class LivyRestModelTransformer {
                             // dataType is always empty if %json of dataframe directly:: https://www.mail-archive.com/user@livy.incubator.apache.org/msg00262.html
                             qrc.setDataType(dataType.asText());
                             qrc.setComment(metadata.asText());
-                            resColumns.add(qrc);
+                            tqr.getColumns().add(qrc);
                         }
                     } // will there be types other than "struct"?
                     continue;
@@ -157,20 +154,16 @@ public class LivyRestModelTransformer {
                 while (valuesIter.hasNext()) {
                     ArrayNode valueNode = (ArrayNode) valuesIter.next();
                     Iterator<JsonNode> valueNodes = valueNode.elements();
-                    List<Object> newValues = Lists.newArrayListWithCapacity(resColumns.size());
+                    List<Object> newValues = Lists.newArrayListWithCapacity(tqr.getColumns().size());
                     int colCount = 0;
                     while (valueNodes.hasNext()) {
                         JsonNode value = valueNodes.next();
-                        QueryResultColumn qrc = resColumns.get(colCount++);
-                        // extract values according to the schema that was communicated by spark
-                        switch (qrc.getDataType()) {
-                            // TODO: expand?!?
-                            case "integer":
-                                newValues.add(value.asInt());
-                                break;
-                            default:
-                                newValues.add(value.asText());
-                                break;
+
+                        // extract values according to how jackson deserialized it
+                        if (value.isNumber()) {
+                            newValues.add(value.numberValue());
+                        } else {
+                            newValues.add(value.asText());
                         } // end switch
                     } // end while
                     rowData.add(newValues);
