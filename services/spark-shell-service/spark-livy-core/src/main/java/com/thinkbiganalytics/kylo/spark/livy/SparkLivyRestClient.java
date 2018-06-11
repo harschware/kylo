@@ -20,12 +20,14 @@ package com.thinkbiganalytics.kylo.spark.livy;
  * #L%
  */
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.io.JsonStringEncoder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementsPost;
 import com.thinkbiganalytics.kylo.model.enums.StatementState;
 import com.thinkbiganalytics.kylo.utils.LivyRestModelTransformer;
-import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
 import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.kylo.utils.StatementStateTranslator;
 import com.thinkbiganalytics.rest.JerseyRestClient;
@@ -56,8 +58,6 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     @Resource
     private ScriptGenerator scriptGenerator;
 
-    @Resource
-    private ScalaScriptService scalaScriptService;
 
     /**
      * Default file system
@@ -181,6 +181,7 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         sparkLivyProcessManager.setLastStatementId(process, statement.getId());
         logger.info("getStatement id={}, spr={}", stmtId, statement);
         TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement, transformId);
+
         return Optional.of(response);
     }
 
@@ -250,6 +251,8 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         return statement;
     }
 
+    private static final ObjectMapper mapper = new ObjectMapper();
+
 
     @Nonnull
     @Override
@@ -259,7 +262,17 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
         // a tablename will be calculated for the request
-        String script = scalaScriptService.wrapScriptForLivy(request);
+        String transformerRequestJson;
+        try {
+            transformerRequestJson = mapper.writeValueAsString(request);
+        } catch (JsonProcessingException e) {
+            throw new LivyException("Unable to serialize from original transform request");
+        }
+
+
+        transformerRequestJson = new String(JsonStringEncoder.getInstance().quoteAsString(transformerRequestJson));
+
+        String script = scriptGenerator.wrappedScript("newTransform", "", "\n", scalaStr(transformerRequestJson));
 
         Statement statement = submitCode(client, script, process);
 
@@ -268,8 +281,6 @@ public class SparkLivyRestClient implements SparkShellRestClient {
         TransformResponse response = new TransformResponse();
         response.setStatus(StatementStateTranslator.translate(statement.getState()));
         response.setProgress(statement.getProgress());
-
-        response.setTable(scalaScriptService.transformCache.getIfPresent(request));
 
         return response;
     }

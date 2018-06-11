@@ -94,22 +94,6 @@ com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkCon
                 </entry>
 
 
-                <entry key="pagedDataFrame">
-                    <value>
-                        <![CDATA[
-val (startCol, stopCol) = (%s, %s);
-val lastCol = df.columns.length - 1
-val dfStartCol = if( lastCol >= startCol ) startCol else lastCol
-val dfStopCol = if( lastCol >= stopCol) stopCol else lastCol
-df = df.select( dfStartCol to dfStopCol map df.columns map col: _*)
-
-val (startRow, stopRow) = (%s, %s);
-val dfRows = List( df.schema.json, df.rdd.zipWithIndex.filter( pair => pair._2>= startRow  && pair._2<= stopRow)
-    .map(_._1).collect.map(x => x.toSeq) )
-                        ]]>
-                    </value>
-                </entry>
-
                 <entry key="getDataSources">
                     <value>
                         <![CDATA[
@@ -127,6 +111,19 @@ val respAsStr = mapper.writeValueAsString(dataSources)
 val saveResult = sparkShellTransformController.getSaveResult(%s)
 val respAsStr = mapper.writeValueAsString(saveResult.getPath().toUri())
 %%json respAsStr
+                        ]]>
+                    </value>
+                </entry>
+
+                <entry key="newTransform">
+                    <value>
+                        <![CDATA[
+val json = %s
+val transformRequest: com.thinkbiganalytics.spark.rest.model.TransformRequest = mapper.readValue(json,
+     classOf[com.thinkbiganalytics.spark.rest.model.TransformRequest] )
+val transformResponse = transformService.execute(transformRequest)
+val dfRowsAsJson = mapper.writeValueAsString(transformResponse)
+%%json dfRowsAsJson
                         ]]>
                     </value>
                 </entry>

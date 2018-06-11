@@ -26,7 +26,6 @@ import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.exceptions.LivyServerNotReachableException;
 import com.thinkbiganalytics.kylo.model.*;
 import com.thinkbiganalytics.kylo.model.enums.SessionState;
-import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
 import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.rest.JerseyClientConfig;
 import com.thinkbiganalytics.rest.JerseyRestClient;
@@ -40,7 +39,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Resource;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public class SparkLivyProcessManager implements SparkShellProcessManager {
     private static final Logger logger = LoggerFactory.getLogger(SparkLivyProcessManager.class);

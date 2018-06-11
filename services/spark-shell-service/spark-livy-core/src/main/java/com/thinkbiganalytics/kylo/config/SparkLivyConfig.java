@@ -23,12 +23,14 @@ package com.thinkbiganalytics.kylo.config;
 import com.thinkbiganalytics.kylo.spark.conf.KerberosSparkProperties;
 import com.thinkbiganalytics.kylo.spark.livy.SparkLivyProcessManager;
 import com.thinkbiganalytics.kylo.spark.livy.SparkLivyRestClient;
-import com.thinkbiganalytics.kylo.utils.ScalaScriptService;
 import com.thinkbiganalytics.kylo.utils.ScriptGenerator;
 import com.thinkbiganalytics.spark.shell.SparkShellRestClient;
 import org.apache.hadoop.fs.FileSystem;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportResource;
+import org.springframework.context.annotation.PropertySource;
 
 import java.io.IOException;
 
@@ -71,10 +73,6 @@ public class SparkLivyConfig {
         return new ScriptGenerator();
     }
 
-    @Bean
-    public ScalaScriptService scalaScriptService() {
-        return new ScalaScriptService();
-    }
 
     /**
      * Gets the Hadoop File System.

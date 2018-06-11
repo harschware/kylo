@@ -23,13 +23,9 @@ package com.thinkbiganalytics.kylo.utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
-import com.thinkbiganalytics.discovery.model.DefaultQueryResultColumn;
-import com.thinkbiganalytics.discovery.schema.QueryResultColumn;
 import com.thinkbiganalytics.kylo.exceptions.LivyCodeException;
 import com.thinkbiganalytics.kylo.exceptions.LivyDeserializationException;
-import com.thinkbiganalytics.kylo.exceptions.LivyException;
 import com.thinkbiganalytics.kylo.model.Statement;
 import com.thinkbiganalytics.kylo.model.StatementOutputResponse;
 import com.thinkbiganalytics.kylo.model.enums.StatementOutputStatus;
@@ -56,13 +52,14 @@ public class LivyRestModelTransformer {
     private LivyRestModelTransformer() {
     } // static methods only
 
+
     public static TransformResponse toTransformResponse(Statement statement, String transformId) {
         TransformResponse response = prepTransformResponse(statement, transformId);
 
         if (response.getStatus() == TransformResponse.Status.SUCCESS) {
             String code = statement.getCode();
             if (code.endsWith("dfRowsAsJson\n")) {
-                response.setResults(toTransformQueryResultWithSchema(statement.getOutput()));
+                return toTransformQueryResultWithSchema(statement.getOutput());
             } else if (code.endsWith("dfProf")) {
                 List<OutputRow> rows = toTransformResponseProfileStats(statement.getOutput());
                 response.setProfile(toTransformResponseProfileStats(statement.getOutput()));
@@ -74,7 +71,7 @@ public class LivyRestModelTransformer {
                 response.setActualRows(actualRows);
                 response.setResults(emptyResult());
             } else {
-                throw new LivyException("Unsupported result type requested of Livy.  Results not recognized");
+                throw new LivyCodeException("Unsupported result type requested of Livy.  Results not recognized");
             } // end if
         }
 
@@ -82,138 +79,11 @@ public class LivyRestModelTransformer {
     }
 
 
-    private static TransformQueryResult toTransformQueryResultWithSchema(StatementOutputResponse sor) {
+    private static TransformResponse toTransformQueryResultWithSchema(StatementOutputResponse sor) {
         checkCodeWasWellFormed(sor);
 
-        TransformQueryResult tqr = new TransformQueryResult();
-        tqr.setColumns(Lists.newArrayList());
-
-        JsonNode data = sor.getData();
-        if (data != null) {
-            JsonNode appJson = data.get("application/json");
-            String payload = appJson.asText();
-
-            ArrayNode json;
-            try {
-                json = (ArrayNode) mapper.readTree(payload);
-            } catch (IOException e) {
-                throw new LivyDeserializationException("Unable to read dataFrame returned from Livy");
-            } // end try/catch
-
-            int numRows = 0;
-
-            Iterator<JsonNode> rowIter = json.elements();
-            List<List<Object>> rowData = Lists.newArrayList();
-            while (rowIter.hasNext()) {
-                JsonNode row = rowIter.next();
-                if (numRows++ == 0) {
-                    String schemaPayload = row.asText();
-
-                    ObjectNode schemaObj;
-                    try {
-                        schemaObj = (ObjectNode) mapper.readTree(schemaPayload);
-                    } catch (IOException e) {
-                        throw new LivyDeserializationException("Unable to read deserialize dataFrame schema returned from Livy");
-                    } // end try/catch
-
-                    //  build column metadata
-                    logger.debug("build column metadata");
-                    String type = schemaObj.get("type").asText();
-                    if (type.equals("struct")) {
-                        ArrayNode fields = (ArrayNode) schemaObj.get("fields");
-
-                        Iterator<JsonNode> colObjsIter = fields.elements();
-
-                        int colIdx = 0;
-                        while (colObjsIter.hasNext()) {
-                            ObjectNode colObj = (ObjectNode) colObjsIter.next();
-                            final JsonNode dataType = colObj.get("type");
-                            JsonNode metadata = colObj.get("metadata");
-                            String name = colObj.get("name").asText();
-                            String nullable = colObj.get("nullable").asText();  // "true"|"false"
-
-                            QueryResultColumn qrc = new DefaultQueryResultColumn();
-                            qrc.setDisplayName(name);
-                            qrc.setField(name);
-                            qrc.setHiveColumnLabel(name);  // not used, but still be expected to be unique
-                            qrc.setIndex(colIdx++);
-                            // dataType is always empty if %json of dataframe directly:: https://www.mail-archive.com/user@livy.incubator.apache.org/msg00262.html
-                            qrc.setDataType(convertDataFrameDataType(dataType));
-                            qrc.setComment(metadata.asText());
-                            tqr.getColumns().add(qrc);
-                        }
-                    } // will there be types other than "struct"?
-                    continue;
-                } // end schema extraction
-
-                // get row data
-                logger.debug("build row data");
-                ArrayNode valueRows = (ArrayNode) row;
-
-                Iterator<JsonNode> valuesIter = valueRows.elements();
-                while (valuesIter.hasNext()) {
-                    ArrayNode valueNode = (ArrayNode) valuesIter.next();
-                    Iterator<JsonNode> valueNodes = valueNode.elements();
-                    List<Object> newValues = Lists.newArrayListWithCapacity(tqr.getColumns().size());
-                    while (valueNodes.hasNext()) {
-                        JsonNode value = valueNodes.next();
-
-                        // extract values according to how jackson deserialized it
-                        if( value.isObject() ) {
-                            ArrayNode valuesArray = (ArrayNode)value.get("values");
-                            Iterator<JsonNode> arrIter = valuesArray.iterator();
-                            List<Object> arrVals = Lists.newArrayListWithExpectedSize(valuesArray.size());
-                            while( arrIter.hasNext() ) {
-                                JsonNode valNode = arrIter.next();
-                                if( valNode.isNumber() ) {
-                                    arrVals.add(valNode.numberValue());
-                                } else {
-                                    arrVals.add(valNode.asText());
-                                } // end if
-                            } // end while
-                            newValues.add(arrVals.toArray());
-                        } else if (value.isNumber()) {
-                            newValues.add(value.numberValue());
-                        } else {
-                            newValues.add(value.asText());
-                        } // end if
-                    } // end while
-                    rowData.add(newValues);
-                } // end of valueRows
-            } // end sor.data
-            logger.trace("rowData={}", rowData);
-            tqr.setRows(rowData);
-            //tqr.setValidationResults(null);
-        } // end if data!=null
-        return tqr;
-    }
-
-    private static String convertDataFrameDataType(JsonNode dataType) {
-        if( dataType.isObject() ) {
-            if( dataType.get("type").asText().equals("udt") ) {
-                if( dataType.get("class").asText().equals("org.apache.spark.mllib.linalg.VectorUDT") ) {
-                    // TODO: null check
-                    ArrayNode fields = (ArrayNode)dataType.get("sqlType").get("fields");
-                    Iterator<JsonNode> fieldsIter = fields.elements();
-                    while( fieldsIter.hasNext() ) {
-                        ObjectNode fieldDescriptors = (ObjectNode)fieldsIter.next();
-                        if( fieldDescriptors.get("name").asText().equals("values") ) {
-                            ObjectNode fdObj = (ObjectNode)fieldDescriptors.get("type");
-                            String retVal = fdObj.get("type").asText();
-                            retVal += "<";
-                            retVal += fdObj.get("elementType").asText();
-                            retVal += ">";
-                            return retVal;
-                        }
-
-                    }
-                }
-            } // can there be other types?
-
-            return "";
-        } else {
-            return dataType.asText();
-        }
+        TransformResponse tr = serializeStatementOutputResponse(sor, TransformResponse.class);
+        return tr;
     }
 
 
