@@ -124,7 +124,7 @@ public class LivyRestModelTransformer {
 
                         Iterator<JsonNode> colObjsIter = fields.elements();
 
-                        int idx = 0;
+                        int colIdx = 0;
                         while (colObjsIter.hasNext()) {
                             ObjectNode colObj = (ObjectNode) colObjsIter.next();
                             final JsonNode dataType = colObj.get("type");
@@ -136,9 +136,9 @@ public class LivyRestModelTransformer {
                             qrc.setDisplayName(name);
                             qrc.setField(name);
                             qrc.setHiveColumnLabel(name);  // not used, but still be expected to be unique
-                            qrc.setIndex(idx++);
+                            qrc.setIndex(colIdx++);
                             // dataType is always empty if %json of dataframe directly:: https://www.mail-archive.com/user@livy.incubator.apache.org/msg00262.html
-                            qrc.setDataType(dataType.asText());
+                            qrc.setDataType(convertDataFrameDataType(dataType));
                             qrc.setComment(metadata.asText());
                             tqr.getColumns().add(qrc);
                         }
@@ -155,16 +155,28 @@ public class LivyRestModelTransformer {
                     ArrayNode valueNode = (ArrayNode) valuesIter.next();
                     Iterator<JsonNode> valueNodes = valueNode.elements();
                     List<Object> newValues = Lists.newArrayListWithCapacity(tqr.getColumns().size());
-                    int colCount = 0;
                     while (valueNodes.hasNext()) {
                         JsonNode value = valueNodes.next();
 
                         // extract values according to how jackson deserialized it
-                        if (value.isNumber()) {
+                        if( value.isObject() ) {
+                            ArrayNode valuesArray = (ArrayNode)value.get("values");
+                            Iterator<JsonNode> arrIter = valuesArray.iterator();
+                            List<Object> arrVals = Lists.newArrayListWithExpectedSize(valuesArray.size());
+                            while( arrIter.hasNext() ) {
+                                JsonNode valNode = arrIter.next();
+                                if( valNode.isNumber() ) {
+                                    arrVals.add(valNode.numberValue());
+                                } else {
+                                    arrVals.add(valNode.asText());
+                                } // end if
+                            } // end while
+                            newValues.add(arrVals.toArray());
+                        } else if (value.isNumber()) {
                             newValues.add(value.numberValue());
                         } else {
                             newValues.add(value.asText());
-                        } // end switch
+                        } // end if
                     } // end while
                     rowData.add(newValues);
                 } // end of valueRows
@@ -174,6 +186,34 @@ public class LivyRestModelTransformer {
             //tqr.setValidationResults(null);
         } // end if data!=null
         return tqr;
+    }
+
+    private static String convertDataFrameDataType(JsonNode dataType) {
+        if( dataType.isObject() ) {
+            if( dataType.get("type").asText().equals("udt") ) {
+                if( dataType.get("class").asText().equals("org.apache.spark.mllib.linalg.VectorUDT") ) {
+                    // TODO: null check
+                    ArrayNode fields = (ArrayNode)dataType.get("sqlType").get("fields");
+                    Iterator<JsonNode> fieldsIter = fields.elements();
+                    while( fieldsIter.hasNext() ) {
+                        ObjectNode fieldDescriptors = (ObjectNode)fieldsIter.next();
+                        if( fieldDescriptors.get("name").asText().equals("values") ) {
+                            ObjectNode fdObj = (ObjectNode)fieldDescriptors.get("type");
+                            String retVal = fdObj.get("type").asText();
+                            retVal += "<";
+                            retVal += fdObj.get("elementType").asText();
+                            retVal += ">";
+                            return retVal;
+                        }
+
+                    }
+                }
+            } // can there be other types?
+
+            return "";
+        } else {
+            return dataType.asText();
+        }
     }
 
 
