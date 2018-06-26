@@ -159,22 +159,32 @@ public class LivyRestModelTransformer {
                         JsonNode value = valueNodes.next();
 
                         // extract values according to how jackson deserialized it
-                        if( value.isObject() ) {
-                            ArrayNode valuesArray = (ArrayNode)value.get("values");
-                            Iterator<JsonNode> arrIter = valuesArray.iterator();
-                            List<Object> arrVals = Lists.newArrayListWithExpectedSize(valuesArray.size());
-                            while( arrIter.hasNext() ) {
-                                JsonNode valNode = arrIter.next();
-                                if( valNode.isNumber() ) {
-                                    arrVals.add(valNode.numberValue());
-                                } else {
-                                    arrVals.add(valNode.asText());
-                                } // end if
-                            } // end while
-                            newValues.add(arrVals.toArray());
+                        if (value.isObject()) {
+                            // spark treats an array as a struct with a single field "values" ...
+                            //   Maps and structs can't contain arrays so
+                            ArrayNode valuesArray = (ArrayNode) value.get("values");
+
+                            if (valuesArray != null && valuesArray.isArray()) {
+                                Iterator<JsonNode> arrIter = valuesArray.iterator();
+                                List<Object> arrVals = Lists.newArrayListWithExpectedSize(valuesArray.size());
+                                while (arrIter.hasNext()) {
+                                    JsonNode valNode = arrIter.next();
+                                    if (valNode.isNumber()) {
+                                        arrVals.add(valNode.numberValue());
+                                    } else {
+                                        arrVals.add(valNode.asText());
+                                    } // end if
+                                } // end while
+                                newValues.add(arrVals.toArray());
+                            } else {
+                                // column value must be a struct or a map..
+                                newValues.add(value.toString());
+                            } // end if
                         } else if (value.isNumber()) {
+                            // easy peasy.. it's just a number
                             newValues.add(value.numberValue());
                         } else {
+                            // default = treat it as string..
                             newValues.add(value.asText());
                         } // end if
                     } // end while
@@ -189,31 +199,61 @@ public class LivyRestModelTransformer {
     }
 
     private static String convertDataFrameDataType(JsonNode dataType) {
-        if( dataType.isObject() ) {
-            if( dataType.get("type").asText().equals("udt") ) {
-                if( dataType.get("class").asText().equals("org.apache.spark.mllib.linalg.VectorUDT") ) {
+        if (dataType.isObject()) {
+            String type = dataType.get("type").asText();
+            if (type.equals("udt")) {
+                if (dataType.get("class").asText().equals("org.apache.spark.mllib.linalg.VectorUDT")) {
                     // TODO: null check
-                    ArrayNode fields = (ArrayNode)dataType.get("sqlType").get("fields");
+                    ArrayNode fields = (ArrayNode) dataType.get("sqlType").get("fields");
                     Iterator<JsonNode> fieldsIter = fields.elements();
-                    while( fieldsIter.hasNext() ) {
-                        ObjectNode fieldDescriptors = (ObjectNode)fieldsIter.next();
-                        if( fieldDescriptors.get("name").asText().equals("values") ) {
-                            ObjectNode fdObj = (ObjectNode)fieldDescriptors.get("type");
-                            String retVal = fdObj.get("type").asText();
-                            retVal += "<";
-                            retVal += fdObj.get("elementType").asText();
-                            retVal += ">";
-                            return retVal;
+                    while (fieldsIter.hasNext()) {
+                        ObjectNode fieldDescriptors = (ObjectNode) fieldsIter.next();
+                        if (fieldDescriptors.get("name").asText().equals("values")) {
+                            ObjectNode fdObj = (ObjectNode) fieldDescriptors.get("type");
+                            StringBuilder sb = new StringBuilder(fdObj.get("type").asText());
+                            sb.append("<");
+                            sb.append(fdObj.get("elementType").asText());
+                            sb.append(">");
+                            return sb.toString();
                         }
-
                     }
+                    return "Unknown UDT";
+                } else {
+                    if (dataType.get("class") != null) {
+                        throw new LivyDeserializationException("don't know how to deserialize UDT types for class = "
+                                + dataType.get("class").asText());
+                    } else {
+                        throw new LivyDeserializationException("don't know how to deserialize UDT type of unspecified class");
+                    } // end if
+                } // end if
+            } else if (type.equals("map")) {
+                StringBuilder sb = new StringBuilder(dataType.get("type").asText());
+                sb.append("<");
+                sb.append(dataType.get("keyType").asText());
+                sb.append(",");
+                sb.append(dataType.get("valueType").asText());
+                sb.append(">");
+                return sb.toString();
+            } else if (type.equals("struct")) {
+                ArrayNode fields = (ArrayNode) dataType.get("fields");
+                Iterator<JsonNode> nodes = fields.elements();
+                StringBuilder sb = new StringBuilder("struct<");
+                // assumes min of 1 field in struct
+                while (nodes.hasNext()) {
+                    ObjectNode node = (ObjectNode) nodes.next();
+                    String sfName = node.get("name").asText();
+                    String sfType = node.get("type").asText();
+                    sb.append(sfName + ":" + sfType + ",");
                 }
-            } // can there be other types?
-
-            return "";
+                sb.deleteCharAt(sb.length() - 1);
+                return sb.toString();
+            } else {
+                // can there be other types?
+                return "Unknown Type";
+            } // end if
         } else {
             return dataType.asText();
-        }
+        } // end if
     }
 
 
