@@ -87,8 +87,6 @@ com.thinkbiganalytics.spark.dataprofiler.core.Profiler.profileDataFrame(sparkCon
             ]]>
           </value>
         </entry>
-
-
         <entry key="pagedDataFrame">
           <value>
             <![CDATA[
@@ -124,6 +122,16 @@ val kyloReadResponse = transformService.kyloReaderResponse(kyloCatalogReadReques
 val transformAsStr = mapper.writeValueAsString(kyloReadResponse)
 %%json transformAsStr
 ]]>
+          </value>
+        </entry>
+        <entry key="doTransform">
+          <value>
+            <![CDATA[
+val transformRequest = mapper.readValue(%s, classOf[com.thinkbiganalytics.spark.rest.model.TransformRequest]);
+val response = transformService.execute(transformRequest);
+val transformAsStr = mapper.writeValueAsString(response)
+%%json transformAsStr
+            ]]>
           </value>
         </entry>
         <entry key="getTransform">

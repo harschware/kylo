@@ -20,6 +20,7 @@ package com.thinkbiganalytics.kylo.utils;
  * #L%
  */
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkbiganalytics.kylo.spark.SparkException;
 import com.thinkbiganalytics.kylo.spark.rest.model.job.SparkJobRequest;
 import com.thinkbiganalytics.spark.rest.model.PageSpec;
@@ -74,13 +75,14 @@ public class ScalaScriptService {
      * Modifies the script in request (assumed that it contains a dataframe named df), and creates a List(schema,dataRows) object.  schema is a scala string of json representing the schema.  dataRows
      * is a List of Lists of the row data.  The columns and rows are paged according to the data provided in request.pageSpec.
      */
-    public String wrapScriptForLivy(TransformRequest request, String transformId) {
-
+    public String wrapScriptForLivy(TransformRequest request) {
         String newScript;
         if (request.isDoProfile()) {
             newScript = scriptGenerator.script("profileDataFrame", setParentVar(request));
         } else {
-            newScript = dataFrameWithSchema(request, transformId);
+            String requestAsJson = ScalaScriptUtils.toJsonInScalaString(request);
+            newScript = scriptGenerator.script("doTransform", requestAsJson);
+            //newScript = dataFrameWithSchema(request, transformId);
         }
 
         return newScript;

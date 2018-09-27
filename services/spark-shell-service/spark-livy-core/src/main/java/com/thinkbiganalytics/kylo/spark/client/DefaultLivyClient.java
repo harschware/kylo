@@ -162,6 +162,14 @@ public class DefaultLivyClient implements LivyClient {
     }
 
 
+    /**
+     * polls forever
+     *
+     * @param jerseyClient
+     * @param sparkLivyProcess
+     * @param stmtId
+     * @return
+     */
     @Override
     public Statement pollStatement(JerseyRestClient jerseyClient, SparkLivyProcess sparkLivyProcess, Integer stmtId) {
         return pollStatement(jerseyClient, sparkLivyProcess, stmtId, null);
@@ -176,7 +184,11 @@ public class DefaultLivyClient implements LivyClient {
         long startMillis = System.currentTimeMillis();
         if (wait != null) {
             // Limit the amount of time we will poll for a statement to complete.
-            stopPolling = startMillis + livyProperties.getPollingLimit();
+            if( wait == 0 ) {
+                stopPolling = startMillis + livyProperties.getPollingLimit();
+            } else {
+                stopPolling = startMillis + wait;
+            }
         }
 
         Statement statement;

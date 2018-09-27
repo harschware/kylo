@@ -73,6 +73,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 public class LivyRestModelTransformer {
+
     private static final XLogger logger = XLoggerFactory.getXLogger(LivyRestModelTransformer.class);
 
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -117,7 +118,7 @@ public class LivyRestModelTransformer {
         if (transformResponse.getStatus() == TransformResponse.Status.SUCCESS) {
             String code = statement.getCode().trim();
             if (code.endsWith("dfResultsAsJson")) {
-                transformResponse.setResults(toTransformQueryResultWithSchema(transformResponse,statement.getOutput()));
+                transformResponse.setResults(toTransformQueryResultWithSchema(transformResponse, statement.getOutput()));
             } else if (code.endsWith("dfProf")) {
                 List<OutputRow> rows = toTransformResponseProfileStats(statement.getOutput());
                 transformResponse.setProfile(toTransformResponseProfileStats(statement.getOutput()));
@@ -166,7 +167,7 @@ public class LivyRestModelTransformer {
             // array contains three objects (dfRows, actualCols, actualRows )
             transformResponse.setActualCols(json.get(1).asInt());
             transformResponse.setActualRows(json.get(2).asInt());
-            json = (ArrayNode)json.get(0);
+            json = (ArrayNode) json.get(0);
 
             int numRows = 0;
 
@@ -181,7 +182,7 @@ public class LivyRestModelTransformer {
                     try {
                         schemaObj = (ObjectNode) mapper.readTree(schemaPayload);
                     } catch (IOException e) {
-                        throw logger.throwing( new LivyDeserializationException("Unable to read deserialize dataFrame schema returned from Livy"));
+                        throw logger.throwing(new LivyDeserializationException("Unable to read deserialize dataFrame schema returned from Livy"));
                     } // end try/catch
 
                     //  build column metadata
@@ -380,12 +381,13 @@ public class LivyRestModelTransformer {
         TransformResponse.Status status = StatementStateTranslator.translate(statement.getState());
         response.setStatus(status);
         response.setProgress(statement.getProgress());
-        if (StringUtils.isNotEmpty(transformId)) {
-            response.setTable(transformId);
-        } else {
+        if (StringUtils.isEmpty(transformId)) {
             // generate a new id if we don't have one yet...
-            statementIdCache.put(ScalaScriptService.newTableName(), statement.getId());
+            transformId = ScalaScriptService.newTableName();
         }
+        statementIdCache.put(transformId, statement.getId());
+        response.setTable(transformId);
+
         return response;
     }
 
