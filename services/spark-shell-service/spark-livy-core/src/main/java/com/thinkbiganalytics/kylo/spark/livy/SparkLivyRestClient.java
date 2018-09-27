@@ -90,6 +90,7 @@ public class SparkLivyRestClient implements SparkShellRestClient {
     @Resource
     private LivyProperties livyProperties;
 
+
     /**
      * Default file system
      */
@@ -101,6 +102,15 @@ public class SparkLivyRestClient implements SparkShellRestClient {
      */
     @Nonnull
     final static Cache<String, Integer> transformIdsToLivyId = CacheBuilder.newBuilder()
+        .expireAfterAccess(1, TimeUnit.HOURS)
+        .maximumSize(100)
+        .build();
+
+    /**
+     * Cache of transformId => saveid
+     */
+    @Nonnull
+    final public static Cache<Integer, String> livyIdToTransformId = CacheBuilder.newBuilder()
         .expireAfterAccess(1, TimeUnit.HOURS)
         .maximumSize(100)
         .build();
@@ -361,22 +371,24 @@ public class SparkLivyRestClient implements SparkShellRestClient {
 
         JerseyRestClient client = sparkLivyProcessManager.getClient(process);
 
-        String script = scalaScriptService.wrapScriptForLivy(request);
+        String transformId = ScalaScriptService.newTableName();
+        String script = scalaScriptService.wrapScriptForLivy(request, transformId);
 
         Statement statement = submitCode(client, script, process);
 
-        // check the server for script result.  If polling limit reach just return to UI with PENDING status.
+        // check the server for script result.  If polling limit reached just return to UI and let it decide if it wants to check again
         statement = pollStatement(client, process, statement.getId());
-        // a tablename will be calculated for the request, this will be used to get the livy ID if the UI asks for more polling
-        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement, null);
+        livyIdToTransformId.put(statement.getId(),transformId);
+
+        TransformResponse response = LivyRestModelTransformer.toTransformResponse(statement, transformId);
 
         if (!StatementState.READY_STATES.contains(statement.getState())) {
-            // TODO: it's not ready so new transform id created.. don't bother with it for now..
+            // result from Livy is not ready and a new transform id was created.. don't bother with that one.. let's
             response.setTable(statement.getId().toString());
             return response;
         }
 
-        // sparkLivyProcessManager.setStatementId(response.getTable(), statement.getId() );
+        // Result from Livy is READY!  it either contains the complete query results or a pending transform that needs further checking
 
         if (StatementState.READY_STATES.contains(statement.getState()) && response.getStatus() == TransformResponse.Status.PENDING) {
             // statement is READY and transformResponse is PENDING...
@@ -386,8 +398,7 @@ public class SparkLivyRestClient implements SparkShellRestClient {
             return logger.exit(response);
         }
 
-        // statement is ERROR or CANCELLED or just still busy after timeout -OR- transformResponse is ERROR or SUCCESS...
-        //    then just return to UI with response so it can check again if it wants to..
+        // statement is READY, and is not a pending transform.
         return response;
     }
 

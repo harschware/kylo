@@ -13,9 +13,9 @@ object LivyPaginator {
     var actualRows: Long = 0
 
     LivyLogger.time {
-      df.cache()
-      actualCols = df.columns.length;
-      actualRows = df.count()
+      actualRows = df.cache().count()
+      //actualRows = 1000
+      actualCols = df.columns.length
 
       val lastCol = actualCols - 1
       val dfStartCol = if (lastCol >= startCol) startCol else lastCol
@@ -31,6 +31,7 @@ object LivyPaginator {
       val dfStopRow = if (lastRow >= pageStop) pageStop else lastRow
 
       val pagedRows = dl.slice(dfStartRow, dfStopRow).map(_.toSeq)
+
       dfRows = List(df2.schema.json, pagedRows)
     }
     return List(dfRows, actualCols, actualRows)

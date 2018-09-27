@@ -75,14 +75,14 @@ public class ScalaScriptService {
      * Modifies the script in request (assumed that it contains a dataframe named df), and creates a List(schema,dataRows) object.  schema is a scala string of json representing the schema.  dataRows
      * is a List of Lists of the row data.  The columns and rows are paged according to the data provided in request.pageSpec.
      */
-    public String wrapScriptForLivy(TransformRequest request) {
+    public String wrapScriptForLivy(TransformRequest request, String transformId) {
         String newScript;
         if (request.isDoProfile()) {
             newScript = scriptGenerator.script("profileDataFrame", setParentVar(request));
         } else {
             String requestAsJson = ScalaScriptUtils.toJsonInScalaString(request);
-            newScript = scriptGenerator.script("doTransform", requestAsJson);
-            //newScript = dataFrameWithSchema(request, transformId);
+            // This is for using transformService instead of raw interpreter::    newScript = scriptGenerator.script("doTransform", requestAsJson);
+            newScript = dataFrameWithSchema(request, transformId);
         }
 
         return newScript;

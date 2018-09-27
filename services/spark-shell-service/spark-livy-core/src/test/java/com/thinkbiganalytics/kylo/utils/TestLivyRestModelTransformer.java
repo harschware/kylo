@@ -27,6 +27,8 @@ import com.thinkbiganalytics.kylo.spark.model.Statement;
 import com.thinkbiganalytics.kylo.spark.model.TestSerializing;
 import com.thinkbiganalytics.spark.rest.model.TransformQueryResult;
 import com.thinkbiganalytics.spark.rest.model.TransformResponse;
+
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +44,7 @@ public class TestLivyRestModelTransformer {
 
 
     @Test
+    @Ignore
     public void simpleTestWithSchema() throws IOException {
         final String json = TestUtils.getTestResourcesFileAsString("dataFrameStatementPostResponseWithSchema.json");
 
